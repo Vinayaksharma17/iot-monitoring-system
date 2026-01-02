@@ -1,0 +1,105 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+requirements.txt
+
+# Node.js / npm
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+package-lock.json.backup
+yarn.lock.backup
+
+# Frontend build outputs
+frontend/dist/
+frontend/build/
+frontend/.angular/
+frontend/.cache/
+frontend/tmp/
+*.tsbuildinfo
+.angular/
+
+# Backend build outputs
+backend/dist/
+backend/build/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+database/data/
+database/postgres-data/
+pgdata/
+postgres-data/
+
+# Docker
+docker-compose.override.yml
+
+# Grafana
+grafana/data/
+grafana/plugins/
+grafana/provisioning/
+grafana.db
+
+# Node-RED
+node-red/node_modules/
+node-red/.config.json
+node-red/.sessions.json
+node-red/lib/
+node-red/settings.js.backup
+node-red/.flows.json.backup
+node-red/flows_cred.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Backups
+*.bak
+*.backup
+*.old
+*.orig
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+
+# Test coverage
+coverage/
+.nyc_output/
