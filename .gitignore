@@ -15,6 +15,10 @@ ADMINER_GUIDE.md
 DOCKER_COMPOSE_GUIDE.md
 frontend-setup.txt
 node-red-setup.txt
+FRONTEND_FIXES.md
+FRONTEND_STATUS.md
+PHASE5_COMPLETE.md
+FRONTEND_READY.md
 
 # Node.js / npm
 node_modules/
