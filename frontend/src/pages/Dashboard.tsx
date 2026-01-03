@@ -1,15 +1,28 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Bed, Gauge, Activity, TrendingUp, ExternalLink } from 'lucide-react'
+import { Bed, Gauge, Activity, TrendingUp, X } from 'lucide-react'
 import { useBedrooms } from '@/hooks/useBedrooms'
 import { useSensors } from '@/hooks/useSensors'
 import { useLatestSensorLogs } from '@/hooks/useSensorLogs'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { format } from 'date-fns'
 
+// Grafana dashboard URLs (update these with your actual share links)
+const GRAFANA_DASHBOARDS = {
+  allBedrooms:
+    'http://localhost:3001/d/f2499d5f-f11b-447e-b9b1-385f2f79b302/all-bedrooms-real-time-overview?orgId=1&refresh=5s',
+  singleBedroom:
+    'http://localhost:3001/d/dd58271e-9e62-43f7-92f2-e9dfe36634d5/single-bedroom-dashboard?orgId=1&refresh=30s&var-bedroom_id=1',
+}
+
 export function Dashboard() {
   const { data: bedrooms, isLoading: bedroomsLoading } = useBedrooms()
   const { data: sensors, isLoading: sensorsLoading } = useSensors()
   const { data: latestLogs, isLoading: logsLoading } = useLatestSensorLogs()
+  const [grafanaModal, setGrafanaModal] = useState<{
+    isOpen: boolean
+    type: 'allBedrooms' | 'singleBedroom' | null
+  }>({ isOpen: false, type: null })
 
   if (bedroomsLoading || sensorsLoading || logsLoading) {
     return (
@@ -20,7 +33,8 @@ export function Dashboard() {
   }
 
   const totalReadings = latestLogs?.length || 0
-  const activeSensors = sensors?.filter((s) => s.isActive).length || 0
+  // sensors from /api/sensors/active are all active by definition
+  const activeSensors = sensors?.length || 0
 
   return (
     <div className="space-y-6">
@@ -126,7 +140,7 @@ export function Dashboard() {
         <h2 className="text-lg font-semibold text-gray-900 mb-4">
           Quick Links
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Link
             to="/bedrooms"
             className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors"
@@ -147,21 +161,76 @@ export function Dashboard() {
               <p className="text-sm text-gray-500">Configure sensors</p>
             </div>
           </Link>
-          <a
-            href="http://localhost:3001"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors"
+          <button
+            onClick={() =>
+              setGrafanaModal({ isOpen: true, type: 'allBedrooms' })
+            }
+            className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors text-left w-full"
           >
             <Activity className="h-8 w-8 text-primary-600 mr-3" />
             <div className="flex-1">
-              <h3 className="font-medium text-gray-900">View in Grafana</h3>
-              <p className="text-sm text-gray-500">Detailed analytics</p>
+              <h3 className="font-medium text-gray-900">All Bedrooms</h3>
+              <p className="text-sm text-gray-500">Real-time overview</p>
             </div>
-            <ExternalLink className="h-5 w-5 text-gray-400" />
-          </a>
+          </button>
+          <button
+            onClick={() =>
+              setGrafanaModal({ isOpen: true, type: 'singleBedroom' })
+            }
+            className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors text-left w-full"
+          >
+            <Activity className="h-8 w-8 text-primary-600 mr-3" />
+            <div className="flex-1">
+              <h3 className="font-medium text-gray-900">Single Bedroom</h3>
+              <p className="text-sm text-gray-500">Detailed view</p>
+            </div>
+          </button>
         </div>
       </div>
+
+      {/* Grafana Dashboard Modal */}
+      {grafanaModal.isOpen && grafanaModal.type && (
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+            onClick={() => setGrafanaModal({ isOpen: false, type: null })}
+          />
+
+          {/* Modal - Full Screen */}
+          <div className="fixed inset-0 flex items-center justify-center">
+            <div className="relative bg-white w-screen h-screen flex flex-col">
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-3 border-b border-gray-200 bg-white">
+                <h3 className="text-xl font-semibold text-gray-900">
+                  {grafanaModal.type === 'allBedrooms'
+                    ? 'All Bedrooms - Real-Time Overview'
+                    : 'Single Bedroom Dashboard'}
+                </h3>
+                <button
+                  onClick={() => setGrafanaModal({ isOpen: false, type: null })}
+                  className="text-gray-400 hover:text-gray-500 transition-colors p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              {/* Iframe Content - Full Screen */}
+              <div className="flex-1 overflow-hidden">
+                <iframe
+                  src={GRAFANA_DASHBOARDS[grafanaModal.type]}
+                  className="w-full h-full border-0"
+                  title={
+                    grafanaModal.type === 'allBedrooms'
+                      ? 'All Bedrooms Dashboard'
+                      : 'Single Bedroom Dashboard'
+                  }
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
