@@ -42,7 +42,8 @@ export function useCreateSensor() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (data: CreateSensorInput & { bedroomId: number }) => sensorApi.create(data),
+    mutationFn: (data: CreateSensorInput & { bedroomId: number }) =>
+      sensorApi.create(data),
     onSuccess: (newSensor: Sensor) => {
       queryClient.invalidateQueries({ queryKey: sensorKeys.all })
       queryClient.invalidateQueries({
