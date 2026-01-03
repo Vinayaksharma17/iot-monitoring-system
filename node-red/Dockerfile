@@ -20,10 +20,8 @@ USER node-red
 WORKDIR /usr/src/node-red
 
 # Install custom Node-RED nodes
-RUN npm install --save \
-    node-red-node-postgres@1.0.4 \
-    node-red-contrib-loop-processing@0.6.1 \
-    node-red-dashboard@3.6.0
+# Note: PostgreSQL nodes can be installed via the Node-RED UI (Manage Palette)
+RUN npm install --save node-red-dashboard
 
 # Create data directory
 RUN mkdir -p /data
