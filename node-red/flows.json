@@ -1,0 +1,256 @@
+[
+  {
+    "id": "flow1",
+    "type": "tab",
+    "label": "IoT Sensor Data Simulation",
+    "disabled": false,
+    "info": "Simulates temperature and humidity sensor data for multiple bedrooms.\nFetches active sensors from backend API and generates realistic sensor readings every 60 seconds."
+  },
+  {
+    "id": "inject_on_start",
+    "type": "inject",
+    "z": "flow1",
+    "name": "Load Sensors on Start",
+    "props": [
+      {
+        "p": "payload"
+      }
+    ],
+    "repeat": "",
+    "crontab": "",
+    "once": true,
+    "onceDelay": "5",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 80,
+    "wires": [
+      [
+        "http_get_sensors"
+      ]
+    ]
+  },
+  {
+    "id": "http_get_sensors",
+    "type": "http request",
+    "z": "flow1",
+    "name": "GET Active Sensors",
+    "method": "GET",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "http://backend:3000/api/sensors/active",
+    "tls": "",
+    "persist": false,
+    "proxy": "",
+    "authType": "basic",
+    "senderr": false,
+    "x": 380,
+    "y": 80,
+    "wires": [
+      [
+        "store_sensors"
+      ]
+    ]
+  },
+  {
+    "id": "store_sensors",
+    "type": "function",
+    "z": "flow1",
+    "name": "Store Active Sensors",
+    "func": "// Store active sensors in global context\nif (msg.payload && msg.payload.success && msg.payload.data) {\n    const sensors = msg.payload.data;\n    global.set('activeSensors', sensors);\n    \n    // Initialize last values for smooth transitions\n    const lastValues = {};\n    sensors.forEach(sensor => {\n        const mid = (sensor.minValue + sensor.maxValue) / 2;\n        lastValues[sensor.sensorId] = mid;\n    });\n    global.set('lastSensorValues', lastValues);\n    \n    msg.payload = {\n        loaded: true,\n        count: sensors.length,\n        sensors: sensors\n    };\n    \n    node.status({fill:\"green\", shape:\"dot\", text:`${sensors.length} sensors loaded`});\n} else {\n    msg.payload = {\n        loaded: false,\n        error: 'Failed to load sensors'\n    };\n    node.status({fill:\"red\", shape:\"dot\", text:\"Failed to load sensors\"});\n}\n\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 620,
+    "y": 80,
+    "wires": [
+      [
+        "debug_sensors_loaded"
+      ]
+    ]
+  },
+  {
+    "id": "debug_sensors_loaded",
+    "type": "debug",
+    "z": "flow1",
+    "name": "Sensors Loaded",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 870,
+    "y": 80,
+    "wires": []
+  },
+  {
+    "id": "inject_every_minute",
+    "type": "inject",
+    "z": "flow1",
+    "name": "Trigger Every 60s",
+    "props": [
+      {
+        "p": "payload"
+      },
+      {
+        "p": "topic",
+        "vt": "str"
+      }
+    ],
+    "repeat": "60",
+    "crontab": "",
+    "once": false,
+    "onceDelay": "10",
+    "topic": "",
+    "payload": "",
+    "payloadType": "date",
+    "x": 150,
+    "y": 200,
+    "wires": [
+      [
+        "prepare_sensors"
+      ]
+    ]
+  },
+  {
+    "id": "prepare_sensors",
+    "type": "function",
+    "z": "flow1",
+    "name": "Prepare Sensor Array",
+    "func": "// Retrieve active sensors from global context\nconst sensors = global.get('activeSensors') || [];\n\nif (sensors.length === 0) {\n    node.status({fill:\"yellow\", shape:\"ring\", text:\"No sensors loaded\"});\n    return null;\n}\n\nnode.status({fill:\"green\", shape:\"dot\", text:`Processing ${sensors.length} sensors`});\n\nmsg.payload = sensors;\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 380,
+    "y": 200,
+    "wires": [
+      [
+        "split_sensors"
+      ]
+    ]
+  },
+  {
+    "id": "split_sensors",
+    "type": "split",
+    "z": "flow1",
+    "name": "Split Sensor Array",
+    "splt": "\\n",
+    "spltType": "str",
+    "arraySplt": 1,
+    "arraySpltType": "len",
+    "stream": false,
+    "addname": "",
+    "x": 610,
+    "y": 200,
+    "wires": [
+      [
+        "generate_sensor_value"
+      ]
+    ]
+  },
+  {
+    "id": "generate_sensor_value",
+    "type": "function",
+    "z": "flow1",
+    "name": "Generate Realistic Value",
+    "func": "// Get sensor info from payload\nconst sensor = msg.payload;\nconst sensorId = sensor.sensorId;\nconst sensorName = sensor.sensorName;\nconst bedroomName = sensor.bedroomName;\nconst type = sensor.type;\nconst minValue = sensor.minValue;\nconst maxValue = sensor.maxValue;\n\n// Get last value for this sensor\nconst lastValues = global.get('lastSensorValues') || {};\nconst lastValue = lastValues[sensorId] || (minValue + maxValue) / 2;\n\n// Generate realistic value with smooth transitions\n// Allow small variations (±2 units) from last value\nconst maxChange = (type === 'temperature') ? 1.5 : 3.0;\nconst randomChange = (Math.random() - 0.5) * 2 * maxChange;\nlet newValue = lastValue + randomChange;\n\n// Ensure value stays within bounds\nnewValue = Math.max(minValue, Math.min(maxValue, newValue));\n\n// Round to 2 decimal places\nnewValue = Math.round(newValue * 100) / 100;\n\n// Store the new value\nlastValues[sensorId] = newValue;\nglobal.set('lastSensorValues', lastValues);\n\n// Prepare the message for database insert\nmsg.payload = {\n    sensor_id: sensorId,\n    room_name: bedroomName,\n    sensor_name: sensorName,\n    value: newValue,\n    timestamp: new Date().toISOString()\n};\n\nmsg.topic = \"INSERT INTO sensor_logs (sensor_id, room_name, sensor_name, timestamp, value) VALUES ($1, $2, $3, $4, $5)\";\nmsg.queryParameters = [sensorId, bedroomName, sensorName, msg.payload.timestamp, newValue];\n\nnode.status({\n    fill: \"blue\",\n    shape: \"dot\",\n    text: `${bedroomName} - ${sensorName}: ${newValue}`\n});\n\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "initialize": "",
+    "finalize": "",
+    "libs": [],
+    "x": 190,
+    "y": 300,
+    "wires": [
+      [
+        "insert_to_database",
+        "debug_sensor_value"
+      ]
+    ]
+  },
+  {
+    "id": "insert_to_database",
+    "type": "postgres",
+    "z": "flow1",
+    "name": "Insert to PostgreSQL",
+    "query": "",
+    "postgreSQLConfig": "postgres_config",
+    "split": false,
+    "rowsPerMsg": 1,
+    "outputs": 1,
+    "x": 480,
+    "y": 300,
+    "wires": [
+      [
+        "debug_db_result"
+      ]
+    ]
+  },
+  {
+    "id": "debug_sensor_value",
+    "type": "debug",
+    "z": "flow1",
+    "name": "Sensor Value",
+    "active": true,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 470,
+    "y": 380,
+    "wires": []
+  },
+  {
+    "id": "debug_db_result",
+    "type": "debug",
+    "z": "flow1",
+    "name": "DB Insert Result",
+    "active": false,
+    "tosidebar": true,
+    "console": false,
+    "tostatus": false,
+    "complete": "payload",
+    "targetType": "msg",
+    "statusVal": "",
+    "statusType": "auto",
+    "x": 720,
+    "y": 300,
+    "wires": []
+  },
+  {
+    "id": "postgres_config",
+    "type": "postgreSQLConfig",
+    "name": "IoT Database",
+    "host": "postgres",
+    "hostFieldType": "str",
+    "port": "5432",
+    "portFieldType": "num",
+    "database": "iot_monitoring",
+    "databaseFieldType": "str",
+    "ssl": "false",
+    "sslFieldType": "bool",
+    "applicationName": "",
+    "applicationNameType": "str",
+    "max": "10",
+    "maxFieldType": "num",
+    "idle": "1000",
+    "idleFieldType": "num",
+    "connectionTimeout": "10000",
+    "connectionTimeoutFieldType": "num",
+    "user": "iot_user",
+    "userFieldType": "str",
+    "password": "iot_password",
+    "passwordFieldType": "str"
+  }
+]
