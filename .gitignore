@@ -11,6 +11,10 @@ BACKEND_QUICKSTART.md
 PHASE2_SUMMARY.md
 TESTING_AUTH.md
 backend-setup.txt
+ADMINER_GUIDE.md
+DOCKER_COMPOSE_GUIDE.md
+frontend-setup.txt
+node-red-setup.txt
 
 # Node.js / npm
 node_modules/

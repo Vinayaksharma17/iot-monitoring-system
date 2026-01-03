@@ -10,6 +10,7 @@ yarn.lock
 dist
 build
 *.tsbuildinfo
+# Note: tsconfig.json is needed for builds, so don't ignore it
 
 # Environment variables
 .env
@@ -41,6 +42,7 @@ coverage
 .git
 .gitignore
 .gitattributes
+# Note: README.md and tsconfig.json are needed
 
 # Documentation
 README.md
@@ -55,5 +57,4 @@ docs/
 .prettierrc
 .eslintrc
 .editorconfig
-tsconfig.json
 nodemon.json
