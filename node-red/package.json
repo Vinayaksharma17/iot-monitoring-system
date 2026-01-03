@@ -1,0 +1,26 @@
+{
+  "name": "iot-simulation-nodered",
+  "version": "1.0.0",
+  "description": "IoT Simulation Service using Node-RED for generating sensor data",
+  "main": "index.js",
+  "scripts": {
+    "start": "node-red"
+  },
+  "keywords": [
+    "node-red",
+    "iot",
+    "simulation",
+    "sensor-data",
+    "postgresql"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "node-red": "^3.1.0",
+    "@gogovega/node-red-contrib-postgresql": "latest",
+    "node-red-dashboard": "latest"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
