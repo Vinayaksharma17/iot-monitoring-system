@@ -84,7 +84,9 @@ export const bedroomApi = {
 // Sensor API
 export const sensorApi = {
   getAll: async (): Promise<Sensor[]> => {
-    const response = await axiosInstance.get<ApiResponse<Sensor[]>>('/sensors/active')
+    const response = await axiosInstance.get<ApiResponse<Sensor[]>>(
+      '/sensors/active'
+    )
     return response.data.data || []
   },
   getByBedroom: async (bedroomId: number): Promise<Sensor[]> => {
@@ -99,7 +101,9 @@ export const sensorApi = {
     )
     return response.data.data
   },
-  create: async (data: CreateSensorInput & { bedroomId: number }): Promise<Sensor> => {
+  create: async (
+    data: CreateSensorInput & { bedroomId: number }
+  ): Promise<Sensor> => {
     const { bedroomId, ...sensorData } = data
     const response = await axiosInstance.post<ApiResponse<Sensor>>(
       `/sensors/bedrooms/${bedroomId}`,
