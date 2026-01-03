@@ -24,7 +24,7 @@ export interface Sensor {
 export interface SensorLog {
   id: number
   sensorId: number
-  value: string | number  // Backend returns string
+  value: string | number // Backend returns string
   timestamp: string
   createdAt?: string
   roomName?: string
@@ -36,7 +36,7 @@ export interface LatestReading {
   bedroomName: string
   sensorName: string
   sensorType: string
-  value: string | number  // Backend returns string
+  value: string | number // Backend returns string
   unit: string
   timestamp: string
 }
