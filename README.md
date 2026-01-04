@@ -3,7 +3,6 @@
 A full-stack IoT monitoring system for tracking temperature and humidity sensors across multiple bedrooms. Built with React, Node.js, PostgreSQL, Grafana, and Node-RED.
 
 ![Project Status](https://img.shields.io/badge/status-production%20ready-brightgreen)
-![License](https://img.shields.io/badge/license-MIT-blue)
 
 ## 🌟 Features
 
@@ -155,7 +154,6 @@ GET    /api/sensor-logs/latest
 GET    /api/sensor-logs/statistics
 \`\`\`
 
-See [API_DOCUMENTATION.md](API_DOCUMENTATION.md) for details.
 
 ## 📁 Project Structure
 
@@ -195,14 +193,6 @@ docker compose ps
 **Database issues**: Check PostgreSQL logs, verify credentials  
 **Grafana iframe error**: Ensure GF_SECURITY_ALLOW_EMBEDDING=true  
 **No data**: Check Node-RED flows are deployed
-
-## 👥 Authors
-
-**Vinayak Sharma** - [@Vinayaksharma17](https://github.com/Vinayaksharma17)
-
-## 📄 License
-
-MIT License - see LICENSE file
 
 ---
 
