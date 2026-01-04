@@ -1,0 +1,1324 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "# Historical Reports Dashboard\n\n**How to use:**\n1. Select time range using the time picker (top right)\n2. Filter by Bedroom, Sensor, and Sensor Type using dropdowns above\n3. Choose aggregation interval for summary views\n4. Export data using the table panels (click on panel title → Inspect → Data → Download CSV)\n\n**Key Insights:**\n- Daily statistics show min/max/avg patterns\n- Anomaly detection highlights unusual readings\n- Heatmap reveals hourly patterns\n- Peak analysis identifies extreme values",
+        "mode": "markdown"
+      },
+      "pluginVersion": "12.0.0",
+      "title": "Dashboard Instructions",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 3
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  COUNT(*) as \"Total Readings\"\nFROM sensor_logs sl\nJOIN sensors s ON sl.sensor_id = s.id\nWHERE s.bedroom_id IN ($bedroom_filter)\n  AND s.id IN ($sensor_filter)\n  AND s.type IN ($sensor_type_filter)\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo();",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
+        }
+      ],
+      "title": "Total Readings",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 3
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  CONCAT(\n    TO_CHAR(MIN(timestamp), 'YYYY-MM-DD'),\n    ' to ',\n    TO_CHAR(MAX(timestamp), 'YYYY-MM-DD')\n  ) as \"Date Range\"\nFROM sensor_logs sl\nJOIN sensors s ON sl.sensor_id = s.id\nWHERE s.bedroom_id IN ($bedroom_filter)\n  AND s.id IN ($sensor_filter)\n  AND s.type IN ($sensor_type_filter)\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo();",
+          "refId": "A"
+        }
+      ],
+      "title": "Date Range",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 3
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  COUNT(DISTINCT s.bedroom_id) as \"Bedrooms\"\nFROM sensor_logs sl\nJOIN sensors s ON sl.sensor_id = s.id\nWHERE s.bedroom_id IN ($bedroom_filter)\n  AND s.id IN ($sensor_filter)\n  AND s.type IN ($sensor_type_filter)\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo();",
+          "refId": "A"
+        }
+      ],
+      "title": "Bedrooms Monitored",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "orange",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 3
+      },
+      "id": 5,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  COUNT(DISTINCT sl.sensor_id) as \"Active Sensors\"\nFROM sensor_logs sl\nJOIN sensors s ON sl.sensor_id = s.id\nWHERE s.bedroom_id IN ($bedroom_filter)\n  AND s.id IN ($sensor_filter)\n  AND s.type IN ($sensor_type_filter)\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo();",
+          "refId": "A"
+        }
+      ],
+      "title": "Active Sensors",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Min Value"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "blue",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 22
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 26
+                    },
+                    {
+                      "color": "red",
+                      "value": 30
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Max Value"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "blue",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 22
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 26
+                    },
+                    {
+                      "color": "red",
+                      "value": 30
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      },
+      "id": 6,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Date"
+          }
+        ]
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  DATE(sl.timestamp) as \"Date\",\n  b.name as \"Bedroom\",\n  s.name as \"Sensor\",\n  s.type as \"Type\",\n  s.unit as \"Unit\",\n  ROUND(MIN(sl.value)::numeric, 2) as \"Min Value\",\n  ROUND(MAX(sl.value)::numeric, 2) as \"Max Value\",\n  ROUND(AVG(sl.value)::numeric, 2) as \"Avg Value\",\n  ROUND(STDDEV(sl.value)::numeric, 2) as \"Std Dev\",\n  COUNT(*) as \"Reading Count\"\nFROM sensor_logs sl\nJOIN sensors s ON sl.sensor_id = s.id\nJOIN bedrooms b ON s.bedroom_id = b.id\nWHERE s.bedroom_id IN ($bedroom_filter)\n  AND s.id IN ($sensor_filter)\n  AND s.type IN ($sensor_type_filter)\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo()\nGROUP BY DATE(sl.timestamp), b.name, s.name, s.type, s.unit\nORDER BY \"Date\" DESC, b.name, s.name;",
+          "refId": "A"
+        }
+      ],
+      "title": "Daily Statistics (Min/Max/Avg)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  sl.timestamp as time,\n  CONCAT(b.name, ' - ', s.name, ' (', s.type, ')') as metric,\n  sl.value\nFROM sensor_logs sl\nJOIN sensors s ON sl.sensor_id = s.id\nJOIN bedrooms b ON s.bedroom_id = b.id\nWHERE s.bedroom_id IN ($bedroom_filter)\n  AND s.id IN ($sensor_filter)\n  AND s.type IN ($sensor_type_filter)\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo()\nORDER BY sl.timestamp;",
+          "refId": "A"
+        }
+      ],
+      "title": "Historical Value Changes",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Change"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "gradient",
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "green",
+                      "value": 0
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 25
+      },
+      "id": 8,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH first_last AS (\n  SELECT \n    s.id as sensor_id,\n    b.name as bedroom_name,\n    s.name as sensor_name,\n    s.type,\n    FIRST_VALUE(sl.value) OVER (PARTITION BY s.id ORDER BY sl.timestamp ASC) as first_value,\n    FIRST_VALUE(sl.value) OVER (PARTITION BY s.id ORDER BY sl.timestamp DESC) as last_value\n  FROM sensor_logs sl\n  JOIN sensors s ON sl.sensor_id = s.id\n  JOIN bedrooms b ON s.bedroom_id = b.id\n  WHERE s.bedroom_id IN ($bedroom_filter)\n    AND s.id IN ($sensor_filter)\n    AND s.type IN ($sensor_type_filter)\n    AND sl.timestamp >= $__timeFrom()\n    AND sl.timestamp <= $__timeTo()\n)\nSELECT DISTINCT\n  bedroom_name,\n  sensor_name,\n  CONCAT(bedroom_name, ' - ', sensor_name) as \"Sensor\",\n  type as \"Type\",\n  ROUND(first_value::numeric, 2) as \"First Value\",\n  ROUND(last_value::numeric, 2) as \"Last Value\",\n  ROUND((last_value - first_value)::numeric, 2) as \"Change\",\n  ROUND(((last_value - first_value) / NULLIF(first_value, 0) * 100)::numeric, 2) as \"Change %\"\nFROM first_last\nORDER BY bedroom_name, sensor_name;",
+          "refId": "A"
+        }
+      ],
+      "title": "Value Change Comparison (First vs Last)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 33
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  CASE \n    WHEN '$aggregation_interval' = '1h' THEN DATE_TRUNC('hour', sl.timestamp)\n    WHEN '$aggregation_interval' = '6h' THEN DATE_TRUNC('hour', sl.timestamp) - (EXTRACT(HOUR FROM sl.timestamp)::int % 6) * INTERVAL '1 hour'\n    WHEN '$aggregation_interval' = '12h' THEN DATE_TRUNC('hour', sl.timestamp) - (EXTRACT(HOUR FROM sl.timestamp)::int % 12) * INTERVAL '1 hour'\n    WHEN '$aggregation_interval' = '1d' THEN DATE_TRUNC('day', sl.timestamp)\n    WHEN '$aggregation_interval' = '1w' THEN DATE_TRUNC('week', sl.timestamp)\n    ELSE DATE_TRUNC('day', sl.timestamp)\n  END as time,\n  CONCAT(b.name, ' - ', s.name) as metric,\n  ROUND(AVG(sl.value)::numeric, 2) as value\nFROM sensor_logs sl\nJOIN sensors s ON sl.sensor_id = s.id\nJOIN bedrooms b ON s.bedroom_id = b.id\nWHERE s.bedroom_id IN ($bedroom_filter)\n  AND s.id IN ($sensor_filter)\n  AND s.type IN ($sensor_type_filter)\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo()\nGROUP BY time, b.name, s.name\nORDER BY time;",
+          "refId": "A"
+        }
+      ],
+      "title": "Aggregated Average Values (by ${aggregation_interval})",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "blue",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 22
+              },
+              {
+                "color": "yellow",
+                "value": 26
+              },
+              {
+                "color": "orange",
+                "value": 30
+              },
+              {
+                "color": "red",
+                "value": 33
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "id": 10,
+      "options": {
+        "calculate": false,
+        "cellGap": 2,
+        "cellValues": {
+          "decimals": 2
+        },
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "scheme",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "Oranges",
+          "steps": 128
+        },
+        "exemplars": {
+          "color": "rgba(255,0,255,0.7)"
+        },
+        "filterValues": {
+          "le": 1e-9
+        },
+        "legend": {
+          "show": true
+        },
+        "rowsFrame": {
+          "layout": "auto"
+        },
+        "tooltip": {
+          "show": true,
+          "yHistogram": false
+        },
+        "yAxis": {
+          "axisPlacement": "left",
+          "reverse": false
+        }
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  DATE(sl.timestamp) as time,\n  EXTRACT(HOUR FROM sl.timestamp)::text as metric,\n  ROUND(AVG(sl.value)::numeric, 2) as value\nFROM sensor_logs sl\nJOIN sensors s ON sl.sensor_id = s.id\nWHERE s.bedroom_id IN ($bedroom_filter)\n  AND s.id IN ($sensor_filter)\n  AND s.type IN ($sensor_type_filter)\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo()\nGROUP BY DATE(sl.timestamp), EXTRACT(HOUR FROM sl.timestamp)\nORDER BY time, metric;",
+          "refId": "A"
+        }
+      ],
+      "title": "Hourly Pattern Heatmap",
+      "type": "heatmap"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "Critical": {
+                        "color": "red",
+                        "index": 0
+                      },
+                      "Normal": {
+                        "color": "green",
+                        "index": 2
+                      },
+                      "Warning": {
+                        "color": "yellow",
+                        "index": 1
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 49
+      },
+      "id": 11,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true,
+        "sortBy": [
+          {
+            "desc": true,
+            "displayName": "Timestamp"
+          }
+        ]
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH stats AS (\n  SELECT \n    s.id as sensor_id,\n b.name as bedroom_name,\n    s.name as sensor_name,\n    s.type,\n    AVG(sl.value) as avg_value,\n    STDDEV(sl.value) as stddev_value\n  FROM sensor_logs sl\n  JOIN sensors s ON sl.sensor_id = s.id\n  JOIN bedrooms b ON s.bedroom_id = b.id\n  WHERE s.bedroom_id IN ($bedroom_filter)\n    AND s.id IN ($sensor_filter)\n    AND s.type IN ($sensor_type_filter)\n    AND sl.timestamp >= $__timeFrom()\n    AND sl.timestamp <= $__timeTo()\n  GROUP BY s.id, b.name, s.name, s.type\n)\nSELECT \n  TO_CHAR(sl.timestamp, 'YYYY-MM-DD HH24:MI:SS') as \"Timestamp\",\n  st.bedroom_name as \"Bedroom\",\n  st.sensor_name as \"Sensor\",\n  st.type as \"Type\",\n  ROUND(sl.value::numeric, 2) as \"Value\",\n  ROUND(st.avg_value::numeric, 2) as \"Average\",\n  ROUND((sl.value - st.avg_value)::numeric, 2) as \"Deviation\",\n  CASE \n    WHEN ABS(sl.value - st.avg_value) > 2 * st.stddev_value THEN 'Critical'\n    WHEN ABS(sl.value - st.avg_value) > st.stddev_value THEN 'Warning'\n    ELSE 'Normal'\n  END as \"Status\"\nFROM sensor_logs sl\nJOIN stats st ON sl.sensor_id = st.sensor_id\nWHERE ABS(sl.value - st.avg_value) > st.stddev_value\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo()\nORDER BY sl.timestamp DESC;",
+          "refId": "A"
+        }
+      ],
+      "title": "Anomalous Readings (Beyond 1 Std Dev)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 58
+      },
+      "id": 12,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  b.name as \"Bedroom\",\n  s.type as \"Sensor Type\",\n  ROUND(MIN(sl.value)::numeric, 2) as \"Min\",\n  ROUND(MAX(sl.value)::numeric, 2) as \"Max\",\n  ROUND(AVG(sl.value)::numeric, 2) as \"Average\",\n  ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY sl.value)::numeric, 2) as \"Median\",\n  COUNT(*) as \"Readings\"\nFROM sensor_logs sl\nJOIN sensors s ON sl.sensor_id = s.id\nJOIN bedrooms b ON s.bedroom_id = b.id\nWHERE s.bedroom_id IN ($bedroom_filter)\n  AND s.id IN ($sensor_filter)\n  AND s.type IN ($sensor_type_filter)\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo()\nGROUP BY b.name, s.type\nORDER BY b.name, s.type;",
+          "refId": "A"
+        }
+      ],
+      "title": "Bedroom-to-Bedroom Comparison",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Record"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "Highest": {
+                        "color": "red",
+                        "index": 0
+                      },
+                      "Lowest": {
+                        "color": "blue",
+                        "index": 1
+                      }
+                    },
+                    "type": "value"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 66
+      },
+      "id": 13,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH ranked_readings AS (\n  SELECT \n    sl.timestamp,\n    b.name as bedroom_name,\n    s.name as sensor_name,\n    s.type,\n    sl.value,\n    ROW_NUMBER() OVER (PARTITION BY s.id ORDER BY sl.value DESC) as high_rank,\n    ROW_NUMBER() OVER (PARTITION BY s.id ORDER BY sl.value ASC) as low_rank\n  FROM sensor_logs sl\n  JOIN sensors s ON sl.sensor_id = s.id\n  JOIN bedrooms b ON s.bedroom_id = b.id\n  WHERE s.bedroom_id IN ($bedroom_filter)\n    AND s.id IN ($sensor_filter)\n    AND s.type IN ($sensor_type_filter)\n    AND sl.timestamp >= $__timeFrom()\n    AND sl.timestamp <= $__timeTo()\n)\nSELECT \n  bedroom_name as \"Bedroom\",\n  sensor_name as \"Sensor\",\n  type as \"Type\",\n  TO_CHAR(timestamp, 'YYYY-MM-DD HH24:MI') as \"Timestamp\",\n  ROUND(value::numeric, 2) as \"Value\",\n  CASE \n    WHEN high_rank = 1 THEN 'Highest'\n    WHEN low_rank = 1 THEN 'Lowest'\n  END as \"Record\"\nFROM ranked_readings\nWHERE high_rank = 1 OR low_rank = 1\nORDER BY bedroom_name, sensor_name, \"Record\";",
+          "refId": "A"
+        }
+      ],
+      "title": "Peak Values (Highest & Lowest)",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 74
+      },
+      "id": 14,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
+          "enablePagination": true,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "12.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT \n  TO_CHAR(sl.timestamp, 'YYYY-MM-DD HH24:MI:SS') as \"Timestamp\",\n  b.name as \"Bedroom\",\n  s.name as \"Sensor\",\n  s.type as \"Type\",\n  ROUND(sl.value::numeric, 2) as \"Value\",\n  s.unit as \"Unit\"\nFROM sensor_logs sl\nJOIN sensors s ON sl.sensor_id = s.id\nJOIN bedrooms b ON s.bedroom_id = b.id\nWHERE s.bedroom_id IN ($bedroom_filter)\n  AND s.id IN ($sensor_filter)\n  AND s.type IN ($sensor_type_filter)\n  AND sl.timestamp >= $__timeFrom()\n  AND sl.timestamp <= $__timeTo()\nORDER BY sl.timestamp DESC;",
+          "refId": "A"
+        }
+      ],
+      "title": "Complete Dataset (Exportable - Use Inspect > Data > Download CSV)",
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [
+    "iot",
+    "historical",
+    "reports"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "PCC52D03280B7034C"
+        },
+        "definition": "SELECT id as __value, name as __text FROM bedrooms ORDER BY name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Bedroom",
+        "multi": true,
+        "name": "bedroom_filter",
+        "options": [],
+        "query": "SELECT id as __value, name as __text FROM bedrooms ORDER BY name;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "PCC52D03280B7034C"
+        },
+        "definition": "SELECT s.id as __value, CONCAT(b.name, ' - ', s.name) as __text FROM sensors s JOIN bedrooms b ON s.bedroom_id = b.id WHERE s.bedroom_id IN ($bedroom_filter) AND s.is_active = true ORDER BY b.name, s.name;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Sensor",
+        "multi": true,
+        "name": "sensor_filter",
+        "options": [],
+        "query": "SELECT s.id as __value, CONCAT(b.name, ' - ', s.name) as __text FROM sensors s JOIN bedrooms b ON s.bedroom_id = b.id WHERE s.bedroom_id IN ($bedroom_filter) AND s.is_active = true ORDER BY b.name, s.name;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "grafana-postgresql-datasource",
+          "uid": "PCC52D03280B7034C"
+        },
+        "definition": "SELECT DISTINCT type as __value, type as __text FROM sensors ORDER BY type;",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Sensor Type",
+        "multi": true,
+        "name": "sensor_type_filter",
+        "options": [],
+        "query": "SELECT DISTINCT type as __value, type as __text FROM sensors ORDER BY type;",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "1 Day",
+          "value": "1d"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Aggregation",
+        "multi": false,
+        "name": "aggregation_interval",
+        "options": [
+          {
+            "selected": false,
+            "text": "1 Hour",
+            "value": "1h"
+          },
+          {
+            "selected": false,
+            "text": "6 Hours",
+            "value": "6h"
+          },
+          {
+            "selected": false,
+            "text": "12 Hours",
+            "value": "12h"
+          },
+          {
+            "selected": true,
+            "text": "1 Day",
+            "value": "1d"
+          },
+          {
+            "selected": false,
+            "text": "1 Week",
+            "value": "1w"
+          }
+        ],
+        "query": "1h : 1 Hour, 6h : 6 Hours, 12h : 12 Hours, 1d : 1 Day, 1w : 1 Week",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "IoT Monitoring - Historical Reports",
+  "uid": "iot_historical_reports",
+  "version": 1,
+  "weekStart": ""
+}
