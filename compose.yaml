@@ -73,7 +73,7 @@ services:
     container_name: iot-nodered
     restart: unless-stopped
     environment:
-      TZ: ${TZ:-America/New_York}
+      # TZ: ${TZ:-America/New_York}
       NODE_RED_ENABLE_SAFE_MODE: 'false'
       NODE_RED_ENABLE_PROJECTS: 'false'
     ports:
@@ -104,7 +104,7 @@ services:
 
   # Grafana Dashboard
   grafana:
-    image: grafana/grafana:10.2.3
+    image: grafana/grafana:12.3.1
     container_name: iot-grafana
     restart: unless-stopped
     environment:
