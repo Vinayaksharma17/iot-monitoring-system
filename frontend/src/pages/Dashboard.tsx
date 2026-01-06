@@ -7,7 +7,7 @@ import { useLatestSensorLogs } from '@/hooks/useSensorLogs'
 import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 import { format } from 'date-fns'
 
-// Grafana dashboard URLs (update these with your actual share links)
+// Grafana dashboard URLs
 const GRAFANA_DASHBOARDS = {
   allBedrooms:
     'http://localhost:3001/d/f2499d5f-f11b-447e-b9b1-385f2f79b302/all-bedrooms-real-time-overview?orgId=1&refresh=5s',
