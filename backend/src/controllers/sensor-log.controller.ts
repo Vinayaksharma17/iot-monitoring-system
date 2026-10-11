@@ -82,11 +82,77 @@ export const getSensorLogs = async (req: Request, res: Response) => {
       message: 'Sensor logs retrieved successfully',
     })
   } catch (error) {
-    console.error('Error fetching sensor logs:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to fetch sensor logs',
     //   error: error instanceof Error ? error.message : 'Unknown error',
+    })
+  }
+}
+
+/**
+ * Get historical readings for a single sensor
+ * @route GET /api/sensor-logs/sensor/:sensorId
+ * @query startDate, endDate, limit
+ */
+export const getSensorLogsBySensorId = async (req: Request, res: Response) => {
+  try {
+    const { sensorId } = req.params
+    const { startDate, endDate, limit = 100 } = req.query
+
+    const maxLimit = 1000
+    const validLimit = Math.min(Number(limit) || 100, maxLimit)
+
+    const conditions: string[] = ['sl.sensor_id = $1']
+    const values: any[] = [sensorId]
+    let paramCount = 2
+
+    if (startDate) {
+      conditions.push(`sl.timestamp >= $${paramCount++}`)
+      values.push(startDate)
+    }
+
+    if (endDate) {
+      conditions.push(`sl.timestamp <= $${paramCount++}`)
+      values.push(endDate)
+    }
+
+    const queryText = `
+      SELECT
+        sl.id,
+        sl.sensor_id as "sensorId",
+        b.name AS "bedroomName",
+        s.name AS "sensorName",
+        s.type AS "sensorType",
+        s.unit,
+        sl.value,
+        sl.timestamp
+      FROM sensor_logs sl
+      JOIN sensors s ON sl.sensor_id = s.id
+      JOIN bedrooms b ON s.bedroom_id = b.id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY sl.timestamp DESC
+      LIMIT $${paramCount}
+    `
+
+    values.push(validLimit)
+
+    const result = await query(queryText, values)
+
+    res.status(200).json({
+      success: true,
+      data: result.rows,
+      meta: {
+        count: result.rows.length,
+        limit: validLimit,
+        filters: { sensorId, startDate, endDate },
+      },
+      message: 'Sensor logs retrieved successfully',
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch sensor logs',
     })
   }
 }
@@ -118,7 +184,6 @@ export const getLatestReadings = async (req: Request, res: Response) => {
       message: 'Latest sensor readings retrieved successfully',
     })
   } catch (error) {
-    console.error('Error fetching latest readings:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to fetch latest readings',
@@ -197,7 +262,6 @@ export const getStatistics = async (req: Request, res: Response) => {
       message: 'Sensor statistics retrieved successfully',
     })
   } catch (error) {
-    console.error('Error fetching statistics:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to fetch statistics',

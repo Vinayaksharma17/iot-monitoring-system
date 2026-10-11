@@ -7,6 +7,59 @@ import { CreateSensorDTO, UpdateSensorDTO } from '../types/index.js'
 // ==========================================
 
 /**
+ * Get all sensors (active and inactive), optionally filtered by bedroom
+ * @route GET /api/sensors
+ * @query bedroomId
+ */
+export const getAllSensors = async (req: Request, res: Response) => {
+  try {
+    const { bedroomId } = req.query
+
+    const conditions: string[] = []
+    const values: any[] = []
+
+    if (bedroomId) {
+      conditions.push('s.bedroom_id = $1')
+      values.push(bedroomId)
+    }
+
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+
+    const result = await query(
+      `SELECT
+        s.id,
+        s.bedroom_id as "bedroomId",
+        s.name,
+        s.type,
+        s.unit,
+        s.min_value as "minValue",
+        s.max_value as "maxValue",
+        s.is_active as "isActive",
+        s.created_at as "createdAt",
+        s.updated_at as "updatedAt",
+        b.name as "bedroomName"
+      FROM sensors s
+      JOIN bedrooms b ON s.bedroom_id = b.id
+      ${whereClause}
+      ORDER BY b.name, s.type, s.name`,
+      values
+    )
+
+    res.status(200).json({
+      success: true,
+      data: result.rows,
+      message: 'Sensors retrieved successfully',
+    })
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch sensors',
+    })
+  }
+}
+
+/**
  * Get all sensors for a specific bedroom
  * @route GET /api/bedrooms/:bedroomId/sensors
  */
@@ -52,11 +105,9 @@ export const getSensorsByBedroomId = async (req: Request, res: Response) => {
       message: 'Sensors retrieved successfully',
     })
   } catch (error) {
-    console.error('Error fetching sensors:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to fetch sensors',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
@@ -101,11 +152,9 @@ export const getSensorById = async (req: Request, res: Response) => {
       message: 'Sensor retrieved successfully',
     })
   } catch (error) {
-    console.error('Error fetching sensor:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to fetch sensor',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
@@ -159,11 +208,9 @@ export const createSensor = async (req: Request, res: Response) => {
       message: 'Sensor created successfully',
     })
   } catch (error) {
-    console.error('Error creating sensor:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to create sensor',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
@@ -266,11 +313,9 @@ export const updateSensor = async (req: Request, res: Response) => {
       message: 'Sensor updated successfully',
     })
   } catch (error) {
-    console.error('Error updating sensor:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to update sensor',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
@@ -300,11 +345,9 @@ export const deleteSensor = async (req: Request, res: Response) => {
 
     res.status(204).send()
   } catch (error) {
-    console.error('Error deleting sensor:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to delete sensor',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
@@ -335,11 +378,9 @@ export const getActiveSensors = async (req: Request, res: Response) => {
       message: 'Active sensors retrieved successfully',
     })
   } catch (error) {
-    console.error('Error fetching active sensors:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to fetch active sensors',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }

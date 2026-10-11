@@ -22,11 +22,9 @@ export const getAllBedrooms = async (req: Request, res: Response) => {
       message: 'Bedrooms retrieved successfully',
     })
   } catch (error) {
-    console.error('Error fetching bedrooms:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to fetch bedrooms',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
@@ -57,11 +55,9 @@ export const getBedroomById = async (req: Request, res: Response) => {
       message: 'Bedroom retrieved successfully',
     })
   } catch (error) {
-    console.error('Error fetching bedroom:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to fetch bedroom',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
@@ -99,11 +95,9 @@ export const createBedroom = async (req: Request, res: Response) => {
       message: 'Bedroom created successfully',
     })
   } catch (error) {
-    console.error('Error creating bedroom:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to create bedroom',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
@@ -182,11 +176,9 @@ export const updateBedroom = async (req: Request, res: Response) => {
       message: 'Bedroom updated successfully',
     })
   } catch (error) {
-    console.error('Error updating bedroom:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to update bedroom',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
@@ -216,11 +208,9 @@ export const deleteBedroom = async (req: Request, res: Response) => {
 
     res.status(204).send()
   } catch (error) {
-    console.error('Error deleting bedroom:', error)
     res.status(500).json({
       success: false,
       message: 'Failed to delete bedroom',
-      error: error instanceof Error ? error.message : 'Unknown error',
     })
   }
 }
