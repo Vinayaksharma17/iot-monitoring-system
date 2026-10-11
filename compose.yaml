@@ -121,6 +121,14 @@ services:
       GF_INSTALL_PLUGINS: ${GRAFANA_PLUGINS:-}
       # Allow iframe embedding
       GF_SECURITY_ALLOW_EMBEDDING: 'true'
+      # Serve embedded dashboards read-only to unauthenticated users so nobody
+      # needs (or gets) Grafana admin access. Combined with &kiosk in the
+      # iframe URLs this hides the whole top bar including the search toggle.
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_NAME: 'Main Org.'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      # Hide the "Sign in" / login page from anonymous viewers
+      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
       # Use SQLite for Grafana's internal database (keeps iot_monitoring clean)
       # PostgreSQL is still used as datasource for querying sensor data
     ports:

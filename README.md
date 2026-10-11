@@ -213,6 +213,24 @@ docker compose ps
 **Grafana iframe error**: Ensure GF_SECURITY_ALLOW_EMBEDDING=true  
 **No data**: Check Node-RED flows are deployed
 
+### Grafana access lockdown
+
+Embedded dashboards are served **read-only to anonymous users** and the top
+navigation bar (including the search bar and its toggle) is hidden by appending
+`&kiosk` to the iframe URLs in `frontend/src/pages/Dashboard.tsx`.
+
+The Grafana service in `compose.yaml` enforces this:
+
+- `GF_AUTH_ANONYMOUS_ENABLED=true` with `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer`
+  (anonymous users can view but cannot edit).
+- `GF_AUTH_DISABLE_LOGIN_FORM=true` so the admin UI cannot be reached, even
+  with valid credentials.
+
+To temporarily regain admin access for maintenance, set
+`GF_AUTH_DISABLE_LOGIN_FORM=false` and recreate the container
+(`docker compose up -d --force-recreate grafana`), then sign in with the
+`GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` credentials.
+
 ---
 
 **Made with ❤️ by Vinayak Sharma**
