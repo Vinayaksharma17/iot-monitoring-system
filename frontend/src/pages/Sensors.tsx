@@ -22,9 +22,22 @@ const sensorSchema = z.object({
     errorMap: () => ({ message: 'Type must be temperature or humidity' }),
   }),
   unit: z.string().min(1, 'Unit is required').max(20, 'Unit too long'),
-  minValue: z.number().optional(),
-  maxValue: z.number().optional(),
+  minValue: z
+    .number({
+      required_error: 'Min value is required',
+      invalid_type_error: 'Min value must be a number',
+    })
+    .finite('Min value must be a valid number'),
+  maxValue: z
+    .number({
+      required_error: 'Max value is required',
+      invalid_type_error: 'Max value must be a number',
+    })
+    .finite('Max value must be a valid number'),
   isActive: z.boolean().default(true),
+}).refine((data) => data.maxValue > data.minValue, {
+  message: 'Max value must be greater than min value',
+  path: ['maxValue'],
 })
 
 type SensorFormData = z.infer<typeof sensorSchema>
@@ -49,6 +62,8 @@ export function Sensors() {
     handleSubmit,
     reset,
     watch,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<SensorFormData>({
     resolver: zodResolver(sensorSchema),
@@ -87,6 +102,7 @@ export function Sensors() {
   const closeModal = () => {
     setIsModalOpen(false)
     setEditingSensor(null)
+    clearErrors()
     reset()
   }
 
@@ -102,7 +118,12 @@ export function Sensors() {
       }
       closeModal()
     } catch (error) {
-      console.error('Failed to save sensor:', error)
+      const message =
+        error instanceof Error ? error.message : 'Failed to save sensor'
+      setError('root', {
+        type: 'server',
+        message: `${message}. Please login as admin or contact an admin.`,
+      })
     }
   }
 
@@ -402,7 +423,7 @@ export function Sensors() {
                 htmlFor="minValue"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Min Value (optional)
+                Min Value
               </label>
               <input
                 id="minValue"
@@ -412,13 +433,18 @@ export function Sensors() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="0"
               />
+              {errors.minValue && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.minValue.message}
+                </p>
+              )}
             </div>
             <div>
               <label
                 htmlFor="maxValue"
                 className="block text-sm font-medium text-gray-700 mb-1"
               >
-                Max Value (optional)
+                Max Value
               </label>
               <input
                 id="maxValue"
@@ -428,6 +454,11 @@ export function Sensors() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="100"
               />
+              {errors.maxValue && (
+                <p className="mt-1 text-sm text-red-600">
+                  {errors.maxValue.message}
+                </p>
+              )}
             </div>
           </div>
 
@@ -442,6 +473,17 @@ export function Sensors() {
               Active
             </label>
           </div>
+
+          {(errors.root || createMutation.isError || updateMutation.isError) && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+              {errors.root?.message ||
+                (createMutation.error instanceof Error
+                  ? `${createMutation.error.message}. Please login as admin or contact an admin.`
+                  : updateMutation.error instanceof Error
+                  ? `${updateMutation.error.message}. Please login as admin or contact an admin.`
+                  : 'Action not permitted. Please login as admin or contact an admin.')}
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3 pt-4">
             <Button type="button" variant="ghost" onClick={closeModal}>

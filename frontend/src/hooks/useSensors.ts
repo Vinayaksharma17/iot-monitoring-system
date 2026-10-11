@@ -9,11 +9,19 @@ export const sensorKeys = {
   detail: (id: number) => ['sensors', id] as const,
 }
 
-// Get all sensors
+// Get all sensors (admin/management view - all sensors, not just active)
 export function useSensors() {
   return useQuery<Sensor[], Error>({
     queryKey: sensorKeys.all,
     queryFn: sensorApi.getAll,
+  })
+}
+
+// Get active sensors (read-only for dashboards/ingestion UI)
+export function useActiveSensors() {
+  return useQuery<Sensor[], Error>({
+    queryKey: [...sensorKeys.all, 'active'],
+    queryFn: sensorApi.getActive,
   })
 }
 

@@ -1,8 +1,11 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Home, Bed, Gauge, BarChart3 } from 'lucide-react'
+import { Home, Bed, Gauge, BarChart3, LogOut } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { Button } from '@/components/common/Button'
 
 export function Header() {
   const location = useLocation()
+  const { user, logout, isAuthenticated } = useAuth()
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: Home },
@@ -53,12 +56,27 @@ export function Header() {
           </nav>
 
           {/* User Info */}
-          <div className="flex items-center">
-            <div className="text-sm">
-              <p className="text-gray-900 font-medium">Admin User</p>
-              <p className="text-gray-500 text-xs">admin@example.com</p>
+          {isAuthenticated && (
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-right">
+                <p className="text-gray-900 font-medium">
+                  {user?.email ?? 'User'}
+                </p>
+                <p className="text-gray-500 text-xs capitalize">
+                  {user?.role ?? ''}
+                </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={logout}
+                className="flex items-center"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </header>

@@ -8,6 +8,10 @@ import type {
   CreateSensorInput,
   UpdateSensorInput,
   ApiResponse,
+  AuthUser,
+  LoginCredentials,
+  LoginResponse,
+  TokenResponse,
 } from '@/types'
 
 // Create axios instance
@@ -17,16 +21,33 @@ const axiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  // Add Basic Auth for backend API
-  auth: {
-    username: 'admin@example.com',
-    password: 'admin123',
-  },
 })
+
+let accessToken: string | null = null
+
+export const setAuthToken = (token: string | null) => {
+  accessToken = token
+}
+
+export const clearAuthToken = () => {
+  accessToken = null
+}
+
+const getErrorMessage = (error: any): string => {
+  return (
+    error?.response?.data?.message ||
+    error?.message ||
+    'An unexpected error occurred'
+  )
+}
 
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
+    if (accessToken) {
+      config.headers = config.headers || {}
+      config.headers.Authorization = `Bearer ${accessToken}`
+    }
     if (import.meta.env.DEV) {
       console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`)
     }
@@ -37,16 +58,61 @@ axiosInstance.interceptors.request.use(
   }
 )
 
+const AUTH_STORAGE_KEY = 'iot_auth'
+
 // Response interceptor
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
+    const status = error?.response?.status
+    const url: string = error?.config?.url || ''
+
+    // On expired/invalid credentials, clear the session and return to login.
+    // (Skip endpoints where a 401 is an expected result, e.g. bad login.)
+    if (status === 401 && !url.includes('/auth/login')) {
+      clearAuthToken()
+      try {
+        localStorage.removeItem(AUTH_STORAGE_KEY)
+      } catch {
+        // ignore storage errors
+      }
+      if (window.location.pathname !== '/login') {
+        window.location.assign('/login')
+      }
+    }
+
     if (import.meta.env.DEV) {
       console.error('[API Error]', error.response?.data || error.message)
     }
-    return Promise.reject(error)
+    const message = getErrorMessage(error)
+    return Promise.reject(new Error(message))
   }
 )
+
+// Auth API
+export const authApi = {
+  login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
+    const response = await axiosInstance.post<ApiResponse<LoginResponse>>(
+      '/auth/login',
+      credentials
+    )
+    return response.data.data
+  },
+  me: async (): Promise<AuthUser> => {
+    const response = await axiosInstance.get<ApiResponse<AuthUser>>('/auth/me')
+    return response.data.data
+  },
+  refresh: async (refreshToken: string): Promise<TokenResponse> => {
+    const response = await axiosInstance.post<ApiResponse<TokenResponse>>(
+      '/auth/refresh',
+      { refreshToken }
+    )
+    return response.data.data
+  },
+  logout: async (): Promise<void> => {
+    await axiosInstance.post('/auth/logout')
+  },
+}
 
 // Bedroom API
 export const bedroomApi = {
@@ -84,6 +150,10 @@ export const bedroomApi = {
 // Sensor API
 export const sensorApi = {
   getAll: async (): Promise<Sensor[]> => {
+    const response = await axiosInstance.get<ApiResponse<Sensor[]>>('/sensors')
+    return response.data.data || []
+  },
+  getActive: async (): Promise<Sensor[]> => {
     const response = await axiosInstance.get<ApiResponse<Sensor[]>>(
       '/sensors/active'
     )

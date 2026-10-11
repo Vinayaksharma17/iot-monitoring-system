@@ -53,7 +53,7 @@ export interface SensorStatistics {
 
 export interface CreateBedroomInput {
   name: string
-  description: string
+  description?: string
 }
 
 export interface UpdateBedroomInput {
@@ -65,8 +65,8 @@ export interface CreateSensorInput {
   name: string
   type: string
   unit: string
-  minValue?: number
-  maxValue?: number
+  minValue: number
+  maxValue: number
   isActive?: boolean
 }
 
@@ -84,4 +84,31 @@ export interface ApiResponse<T = any> {
   data: T
   message?: string
   error?: string
+}
+
+// ==========================================
+// Auth Types
+// ==========================================
+
+export interface AuthUser {
+  id: number
+  email: string
+  role: 'admin' | 'viewer'
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface LoginCredentials {
+  email: string
+  password: string
+}
+
+export interface TokenResponse {
+  accessToken: string
+  refreshToken: string
+}
+
+export interface LoginResponse extends TokenResponse {
+  user: AuthUser
 }

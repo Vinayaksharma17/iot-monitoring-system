@@ -18,8 +18,9 @@ const bedroomSchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
   description: z
     .string()
-    .min(1, 'Description is required')
-    .max(200, 'Description too long'),
+    .max(500, 'Description too long')
+    .optional()
+    .transform((val) => (val === undefined ? '' : val)),
 })
 
 type BedroomFormData = z.infer<typeof bedroomSchema>
@@ -38,6 +39,8 @@ export function Bedrooms() {
     register,
     handleSubmit,
     reset,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<BedroomFormData>({
     resolver: zodResolver(bedroomSchema),
@@ -51,13 +54,17 @@ export function Bedrooms() {
 
   const openEditModal = (bedroom: Bedroom) => {
     setEditingBedroom(bedroom)
-    reset({ name: bedroom.name, description: bedroom.description })
+    reset({
+      name: bedroom.name,
+      description: bedroom.description || '',
+    })
     setIsModalOpen(true)
   }
 
   const closeModal = () => {
     setIsModalOpen(false)
     setEditingBedroom(null)
+    clearErrors()
     reset()
   }
 
@@ -73,7 +80,13 @@ export function Bedrooms() {
       }
       closeModal()
     } catch (error) {
-      console.error('Failed to save bedroom:', error)
+      const message =
+        error instanceof Error ? error.message : 'Failed to save bedroom'
+      // If unauthorized/forbidden, show a clear message users can act on.
+      setError('root', {
+        type: 'server',
+        message: `${message}. Please login as admin or contact an admin.`,
+      })
     }
   }
 
@@ -228,6 +241,17 @@ export function Bedrooms() {
               </p>
             )}
           </div>
+
+          {(errors.root || createMutation.isError || updateMutation.isError) && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm">
+              {errors.root?.message ||
+                (createMutation.error instanceof Error
+                  ? `${createMutation.error.message}. Please login as admin or contact an admin.`
+                  : updateMutation.error instanceof Error
+                  ? `${updateMutation.error.message}. Please login as admin or contact an admin.`
+                  : 'Action not permitted. Please login as admin or contact an admin.')}
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3 pt-4">
             <Button type="button" variant="ghost" onClick={closeModal}>
