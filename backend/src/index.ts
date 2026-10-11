@@ -4,10 +4,12 @@ import helmet from 'helmet'
 import dotenv from 'dotenv'
 import { logger, morganMiddleware } from './middleware/logger.middleware.js'
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js'
+import authRoutes from './routes/auth.routes.js'
 import bedroomRoutes from './routes/bedroom.routes.js'
 import sensorRoutes from './routes/sensor.routes.js'
 import sensorLogRoutes from './routes/sensor-log.routes.js'
 import pool, { closePool } from './config/database.js'
+import { seedAdminUser } from './config/seed.js'
 
 // Load environment variables
 dotenv.config()
@@ -62,6 +64,7 @@ app.get('/api', (req: Request, res: Response) => {
     message: 'IoT Monitoring System API',
     version: '1.0.0',
     endpoints: {
+      auth: '/api/auth',
       bedrooms: '/api/bedrooms',
       sensors: '/api/sensors',
       sensorLogs: '/api/sensor-logs',
@@ -71,6 +74,7 @@ app.get('/api', (req: Request, res: Response) => {
 })
 
 // Mount API routes
+app.use('/api/auth', authRoutes)
 app.use('/api/bedrooms', bedroomRoutes)
 app.use('/api/sensors', sensorRoutes)
 app.use('/api/sensor-logs', sensorLogRoutes)
@@ -94,6 +98,11 @@ const server = app.listen(PORT, () => {
   logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`)
   logger.info(`🔗 Health check: http://localhost:${PORT}/health`)
   logger.info(`🔗 API base URL: http://localhost:${PORT}/api`)
+
+  // Ensure an initial admin user exists (env-driven, no-op if unset)
+  seedAdminUser().catch((error) => {
+    logger.error('Failed to seed admin user:', error)
+  })
 })
 
 // ==========================================

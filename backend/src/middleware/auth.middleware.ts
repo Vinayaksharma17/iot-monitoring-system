@@ -1,5 +1,7 @@
 import { Request, Response, NextFunction } from 'express'
 import { AppError } from './error.middleware.js'
+import { verifyAccessToken } from '../utils/token.js'
+import { authConfig, UserRole } from '../config/auth.js'
 
 // ==========================================
 // Extended Request Interface with User
@@ -9,8 +11,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: string
     email: string
-    role: string
-    [key: string]: any
+    role: UserRole
   }
 }
 
@@ -19,9 +20,8 @@ export interface AuthRequest extends Request {
 // ==========================================
 
 /**
- * Authenticate user - verify token and attach user to request
- * In production, this would verify JWT tokens
- * For now, this is a placeholder that checks for basic auth header
+ * Authenticate user - verify JWT access token and attach user to request.
+ * Requires an "Authorization: Bearer <token>" header.
  */
 export const authenticateUser = (
   req: AuthRequest,
@@ -29,76 +29,45 @@ export const authenticateUser = (
   next: NextFunction
 ) => {
   try {
-    // Get token from header
     const authHeader = req.headers.authorization
 
     if (!authHeader) {
       throw new AppError(
-        'Authentication required. Please provide credentials.',
+        'Authentication required. Please provide a bearer token.',
         401
       )
     }
 
-    // Parse authorization header
-    // Expected format: "Bearer <token>" or "Basic <base64>"
-    const [authType, authCredentials] = authHeader.split(' ')
+    const [authType, token] = authHeader.split(' ')
 
-    if (!authType || !authCredentials) {
-      throw new AppError('Invalid authentication format', 401)
+    if (authType?.toLowerCase() !== 'bearer' || !token) {
+      throw new AppError(
+        'Invalid authentication format. Expected "Bearer <token>".',
+        401
+      )
     }
 
-    // For demonstration: Basic Auth simulation
-    // In production, replace with JWT verification
-    if (authType.toLowerCase() === 'bearer') {
-      // TODO: Implement JWT verification
-      // const decoded = jwt.verify(authCredentials, process.env.JWT_SECRET)
+    const decoded = verifyAccessToken(token)
 
-      // Mock user for demonstration
-      req.user = {
-        id: '1',
-        email: 'user@example.com',
-        role: 'user', // Default role
-      }
-    } else if (authType.toLowerCase() === 'basic') {
-      // Basic auth for testing
-      const credentials = Buffer.from(authCredentials, 'base64').toString(
-        'utf-8'
-      )
-      const [email, password] = credentials.split(':')
-
-      if (!email || !password) {
-        throw new AppError('Invalid credentials', 401)
-      }
-
-      // Mock authentication - In production, verify against database
-      // For testing: admin@example.com / password123 = admin role
-      //              user@example.com / password123 = user role
-      if (email === 'admin@example.com' && password === 'admin123') {
-        req.user = {
-          id: '1',
-          email: email,
-          role: 'admin',
-        }
-      } else if (email === 'user@example.com' && password === 'user123') {
-        req.user = {
-          id: '2',
-          email: email,
-          role: 'user',
-        }
-      } else {
-        throw new AppError('Invalid credentials', 401)
-      }
-    } else {
-      throw new AppError('Unsupported authentication type', 401)
+    req.user = {
+      id: String(decoded.sub),
+      email: decoded.email,
+      role: decoded.role,
     }
 
     next()
   } catch (error) {
     if (error instanceof AppError) {
-      next(error)
-    } else {
-      next(new AppError('Authentication failed', 401))
+      return next(error)
     }
+    // jsonwebtoken throws TokenExpiredError / JsonWebTokenError
+    if (error instanceof Error && error.name === 'TokenExpiredError') {
+      return next(new AppError('Token expired', 401))
+    }
+    if (error instanceof Error && error.name === 'JsonWebTokenError') {
+      return next(new AppError('Invalid token', 401))
+    }
+    next(new AppError('Authentication failed', 401))
   }
 }
 
@@ -108,20 +77,18 @@ export const authenticateUser = (
 
 /**
  * Check if user has required role(s)
- * @param roles - Array of allowed roles or single role string
+ * @param roles - Array of allowed roles
  */
-export const authorizeRoles = (...roles: string[]) => {
+export const authorizeRoles = (...roles: UserRole[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
         throw new AppError('User not authenticated', 401)
       }
 
-      const userRole = req.user.role
-
-      if (!roles.includes(userRole)) {
+      if (!roles.includes(req.user.role)) {
         throw new AppError(
-          `Access denied. Required role(s): ${roles.join(', ')}. Your role: ${userRole}`,
+          `Access denied. Required role(s): ${roles.join(', ')}. Your role: ${req.user.role}`,
           403
         )
       }
@@ -134,7 +101,8 @@ export const authorizeRoles = (...roles: string[]) => {
 }
 
 /**
- * Check if user has specific permissions
+ * Check if user has specific permissions.
+ * admin has full access; viewer is read-only.
  * @param permissions - Array of required permissions
  */
 export const checkPermissions = (...permissions: string[]) => {
@@ -144,8 +112,6 @@ export const checkPermissions = (...permissions: string[]) => {
         throw new AppError('User not authenticated', 401)
       }
 
-      // In production, check user permissions from database
-      // Mock implementation: admin has all permissions, user has limited
       const userPermissions =
         req.user.role === 'admin'
           ? ['read', 'write', 'update', 'delete']
@@ -169,40 +135,31 @@ export const checkPermissions = (...permissions: string[]) => {
   }
 }
 
+// ==========================================
+// Machine / Ingestion API Key
+// ==========================================
+
 /**
- * Check if user owns the resource or is admin
- * @param resourceUserIdField - Field name to check ownership (e.g., 'userId', 'createdBy')
+ * Optional API-key guard for machine-to-machine ingestion endpoints.
+ * When INGEST_API_KEY is configured, requests must send a matching
+ * X-API-Key header. When it is not configured, the guard is a no-op.
  */
-export const checkOwnershipOrAdmin = (
-  resourceUserIdField: string = 'userId'
+export const requireApiKey = (
+  req: Request,
+  res: Response,
+  next: NextFunction
 ) => {
-  return (req: AuthRequest, res: Response, next: NextFunction) => {
-    try {
-      if (!req.user) {
-        throw new AppError('User not authenticated', 401)
-      }
-
-      // Admin can access any resource
-      if (req.user.role === 'admin') {
-        return next()
-      }
-
-      // Check if user owns the resource
-      const resourceUserId =
-        (req as any)[resourceUserIdField] || req.body[resourceUserIdField]
-
-      if (resourceUserId && resourceUserId === req.user.id) {
-        return next()
-      }
-
-      throw new AppError(
-        'Access denied. You can only access your own resources.',
-        403
-      )
-    } catch (error) {
-      next(error)
-    }
+  if (!authConfig.ingestApiKey) {
+    return next()
   }
+
+  const provided = req.headers['x-api-key']
+
+  if (provided !== authConfig.ingestApiKey) {
+    return next(new AppError('Invalid or missing API key', 401))
+  }
+
+  next()
 }
 
 // ==========================================
@@ -210,7 +167,7 @@ export const checkOwnershipOrAdmin = (
 // ==========================================
 
 /**
- * Optional authentication - attach user if token is valid, but don't fail
+ * Optional authentication - attach user if a valid token is present, but don't fail.
  */
 export const optionalAuth = (
   req: AuthRequest,
@@ -223,10 +180,8 @@ export const optionalAuth = (
     return next()
   }
 
-  try {
-    authenticateUser(req, res, next)
-  } catch (error) {
-    // Don't fail, just continue without user
+  authenticateUser(req, res, (err?: any) => {
+    // Never block the request on optional auth
     next()
-  }
+  })
 }

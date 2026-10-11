@@ -1,5 +1,6 @@
 import pg from 'pg'
 import dotenv from 'dotenv'
+import { logger } from '../middleware/logger.middleware.js'
 
 dotenv.config()
 
@@ -15,13 +16,14 @@ const pool = new Pool({
 
 // Handle pool errors
 pool.on('error', (err: Error) => {
-  console.error('Unexpected error on idle PostgreSQL client', err)
-  process.exit(-1)
+  // Do not crash the process on a transient idle-client error; the pool
+  // will discard the bad client and create a new one on demand.
+  logger.error('Unexpected error on idle PostgreSQL client', { error: err.message })
 })
 
 // Test database connection on startup
 pool.on('connect', () => {
-  console.log('✅ Connected to PostgreSQL database')
+  logger.debug('Connected to PostgreSQL database')
 })
 
 /**
@@ -35,10 +37,13 @@ export const query = async (text: string, params?: any[]) => {
   try {
     const result = await pool.query(text, params)
     const duration = Date.now() - start
-    console.log('Executed query', { text, duration, rows: result.rowCount })
+    // Query params can contain sensitive data, so never log them.
+    logger.debug('Executed query', { duration, rows: result.rowCount })
     return result
   } catch (error) {
-    console.error('Database query error:', error)
+    logger.error('Database query error', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
     throw error
   }
 }
@@ -49,10 +54,11 @@ export const query = async (text: string, params?: any[]) => {
  */
 export const getClient = async () => {
   try {
-    const client = await pool.connect()
-    return client
+    return await pool.connect()
   } catch (error) {
-    console.error('Failed to get database client:', error)
+    logger.error('Failed to get database client', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
     throw error
   }
 }
@@ -63,9 +69,11 @@ export const getClient = async () => {
 export const closePool = async () => {
   try {
     await pool.end()
-    console.log('✅ Database pool closed')
+    logger.info('Database pool closed')
   } catch (error) {
-    console.error('Error closing database pool:', error)
+    logger.error('Error closing database pool', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+    })
     throw error
   }
 }
