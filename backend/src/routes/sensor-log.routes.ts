@@ -1,6 +1,7 @@
 import express from 'express'
 import {
   getSensorLogs,
+  getSensorLogsBySensorId,
   getLatestReadings,
   getStatistics,
 } from '../controllers/sensor-log.controller.js'
@@ -18,6 +19,20 @@ const router = express.Router()
  * @access  Public
  */
 router.get('/', getSensorLogs)
+
+/**
+ * @route   GET /api/sensor-logs/sensor/:sensorId
+ * @desc    Get historical readings for a single sensor
+ * @query   startDate, endDate, limit
+ * @access  Public
+ */
+import { validateNumericId } from '../validators/params.validator.js'
+
+router.get(
+  '/sensor/:sensorId',
+  validateNumericId('sensorId'),
+  getSensorLogsBySensorId
+)
 
 /**
  * @route   GET /api/sensor-logs/latest

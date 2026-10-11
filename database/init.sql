@@ -80,6 +80,32 @@ COMMENT ON TABLE sensor_logs IS 'Stores time-series sensor reading data';
 COMMENT ON COLUMN sensor_logs.value IS 'Sensor reading value';
 
 -- =====================================================
+-- 3.1 Create Users Table (Authentication & RBAC)
+-- =====================================================
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'viewer',
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT check_user_role
+        CHECK (role IN ('admin', 'viewer'))
+);
+
+-- Add comments
+COMMENT ON TABLE users IS 'Stores application users for authentication and role-based access control';
+COMMENT ON COLUMN users.email IS 'Unique login email';
+COMMENT ON COLUMN users.password_hash IS 'Bcrypt password hash - never store plaintext passwords';
+COMMENT ON COLUMN users.role IS 'User role: admin or viewer';
+
+-- Index on unique login email
+CREATE INDEX IF NOT EXISTS idx_users_email
+    ON users(email);
+
+-- =====================================================
 -- 4. Create Indexes for Performance
 -- =====================================================
 
@@ -123,6 +149,12 @@ CREATE TRIGGER trigger_update_bedrooms_updated_at
 -- Apply trigger to sensors table
 CREATE TRIGGER trigger_update_sensors_updated_at
     BEFORE UPDATE ON sensors
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Apply trigger to users table
+CREATE TRIGGER trigger_update_users_updated_at
+    BEFORE UPDATE ON users
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 

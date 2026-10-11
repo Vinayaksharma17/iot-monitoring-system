@@ -15,6 +15,7 @@ import {
   authorizeRoles,
   checkPermissions,
 } from '../middleware/auth.middleware.js'
+import { validateNumericId } from '../validators/params.validator.js'
 
 const router = express.Router()
 
@@ -34,7 +35,12 @@ router.get('/', authenticateUser, getAllBedrooms)
  * @desc    Get bedroom by ID
  * @access  Protected (Authenticated users)
  */
-router.get('/:id', authenticateUser, getBedroomById)
+router.get(
+  '/:id',
+  authenticateUser,
+  validateNumericId('id'),
+  getBedroomById
+)
 
 /**
  * @route   POST /api/bedrooms
@@ -44,8 +50,8 @@ router.get('/:id', authenticateUser, getBedroomById)
 router.post(
   '/',
   authenticateUser,
-  validateCreateBedroom,
   checkPermissions('write'),
+  validateCreateBedroom,
   createBedroom
 )
 
@@ -57,8 +63,9 @@ router.post(
 router.put(
   '/:id',
   authenticateUser,
-  validateUpdateBedroom,
+  validateNumericId('id'),
   checkPermissions('update'),
+  validateUpdateBedroom,
   updateBedroom
 )
 
@@ -67,6 +74,12 @@ router.put(
  * @desc    Delete bedroom by ID (cascade deletes sensors and logs)
  * @access  Protected (Admin only)
  */
-router.delete('/:id', authenticateUser, authorizeRoles('admin'), deleteBedroom)
+router.delete(
+  '/:id',
+  authenticateUser,
+  validateNumericId('id'),
+  authorizeRoles('admin'),
+  deleteBedroom
+)
 
 export default router
