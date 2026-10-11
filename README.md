@@ -100,11 +100,19 @@ docker compose ps
 - **Node-RED**: http://localhost:1880
 - **Adminer**: http://localhost:8081
 
-## 🔐 Login Credentials
+## 🔐 Authentication
 
-**Frontend**: admin@example.com / admin123  
-**Grafana**: admin / admin  
-**Database**: postgres / postgres
+**IMPORTANT:** For security, never use the default demo credentials in production.
+
+The backend seeds an initial admin account at startup when `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` are set. Configure these in your `.env` before starting the backend. No hardcoded login credentials are shipped with the application.
+
+The API uses JWT bearer tokens:
+- `POST /api/auth/login` → returns `accessToken` and `refreshToken`
+- `GET /api/auth/me` → returns the current user (send `Authorization: Bearer <accessToken>`)
+- `POST /api/auth/refresh` → exchanges a valid refresh token for a new access token
+
+**Grafana**: admin / admin (configure via `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`)  
+**Database**: credentials from your `.env` (change defaults in production)
 
 ## 📖 Usage
 
@@ -129,30 +137,41 @@ docker compose ps
 
 ## 📚 API Endpoints
 
+### Authentication
+```
+POST   /api/auth/login      # Authenticate and issue access/refresh tokens
+POST   /api/auth/refresh    # Refresh an access token using a refresh token
+GET    /api/auth/me         # Get current authenticated user (requires auth)
+POST   /api/auth/logout     # Log out (client-side token discard, requires auth)
+```
+
 ### Bedrooms
-\`\`\`
-GET    /api/bedrooms
-GET    /api/bedrooms/:id
-POST   /api/bedrooms
-PUT    /api/bedrooms/:id
-DELETE /api/bedrooms/:id
-\`\`\`
+```
+GET    /api/bedrooms        # Get all bedrooms (requires auth)
+GET    /api/bedrooms/:id    # Get bedroom by ID (requires auth)
+POST   /api/bedrooms        # Create a new bedroom (requires auth + write)
+PUT    /api/bedrooms/:id    # Update bedroom (requires auth + update)
+DELETE /api/bedrooms/:id    # Delete bedroom (requires admin role)
+```
 
 ### Sensors
-\`\`\`
-GET    /api/sensors/active
-GET    /api/sensors/bedrooms/:bedroomId
-POST   /api/sensors/bedrooms/:bedroomId
-PUT    /api/sensors/:id
-DELETE /api/sensors/:id
-\`\`\`
+```
+GET    /api/sensors         # Get all sensors (requires auth)
+GET    /api/sensors/active  # Get active sensors (may require X-API-Key)
+GET    /api/sensors/:id    # Get sensor by ID (requires auth)
+GET    /api/sensors/bedrooms/:bedroomId  # Get sensors for bedroom (requires auth)
+POST   /api/sensors/bedrooms/:bedroomId  # Create sensor (requires auth + write)
+PUT    /api/sensors/:id    # Update sensor (requires auth + update)
+DELETE /api/sensors/:id    # Delete sensor (requires admin role)
+```
 
 ### Sensor Logs
-\`\`\`
-GET    /api/sensor-logs
-GET    /api/sensor-logs/latest
-GET    /api/sensor-logs/statistics
-\`\`\`
+```
+GET    /api/sensor-logs                # Get sensor logs with filters (public)
+GET    /api/sensor-logs/sensor/:id     # Get logs for a specific sensor (public)
+GET    /api/sensor-logs/latest         # Get latest readings (public)
+GET    /api/sensor-logs/statistics     # Get aggregated statistics (public)
+```
 
 
 ## 📁 Project Structure
