@@ -1,11 +1,13 @@
 import bcrypt from 'bcryptjs'
 import { query } from './database.js'
 import { authConfig } from './auth.js'
+import { env } from './env.js'
 import { logger } from '../middleware/logger.middleware.js'
 
 /**
- * Seed an initial admin user when the users table is empty.
- * Controlled entirely by environment variables so no credentials live in code.
+ * Seed an initial admin user when no admin exists yet.
+ * Controlled entirely by environment variables so no credentials live in
+ * code or in the repository.
  *
  * Required env: SEED_ADMIN_EMAIL, SEED_ADMIN_PASSWORD
  */
@@ -18,6 +20,12 @@ export const seedAdminUser = async (): Promise<void> => {
       'Skipping admin seed (SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD not set)'
     )
     return
+  }
+
+  if (env.isProduction && password.length < 12) {
+    throw new Error(
+      'SEED_ADMIN_PASSWORD must be at least 12 characters in production'
+    )
   }
 
   const existing = await query(

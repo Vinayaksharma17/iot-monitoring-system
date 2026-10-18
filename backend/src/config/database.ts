@@ -1,44 +1,46 @@
 import pg from 'pg'
-import dotenv from 'dotenv'
+import { performance } from 'node:perf_hooks'
+import { env } from './env.js'
 import { logger } from '../middleware/logger.middleware.js'
-
-dotenv.config()
 
 const { Pool } = pg
 
-// PostgreSQL connection configuration
+// ==========================================
+// PostgreSQL Connection Pool
+// ==========================================
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection cannot be established
+  connectionString: env.databaseUrl,
+  max: env.dbPoolMax,
+  idleTimeoutMillis: env.dbIdleTimeoutMs,
+  connectionTimeoutMillis: env.dbConnectionTimeoutMs,
 })
 
-// Handle pool errors
+// Idle-client errors (network blips, server restarts) must not crash the
+// process; the pool discards the broken client and reconnects on demand.
 pool.on('error', (err: Error) => {
-  // Do not crash the process on a transient idle-client error; the pool
-  // will discard the bad client and create a new one on demand.
-  logger.error('Unexpected error on idle PostgreSQL client', { error: err.message })
+  logger.error('Unexpected error on idle PostgreSQL client', {
+    error: err.message,
+  })
 })
 
-// Test database connection on startup
 pool.on('connect', () => {
   logger.debug('Connected to PostgreSQL database')
 })
 
 /**
- * Execute a query with error handling
- * @param text SQL query text
- * @param params Query parameters
- * @returns Query result
+ * Execute a parameterized query with timing telemetry.
+ * Query params can contain sensitive data (passwords, tokens), so they
+ * are never logged.
  */
-export const query = async (text: string, params?: any[]) => {
-  const start = Date.now()
+export const query = async (text: string, params?: unknown[]) => {
+  const start = performance.now()
   try {
     const result = await pool.query(text, params)
-    const duration = Date.now() - start
-    // Query params can contain sensitive data, so never log them.
-    logger.debug('Executed query', { duration, rows: result.rowCount })
+    logger.debug('Executed query', {
+      durationMs: Math.round(performance.now() - start),
+      rows: result.rowCount,
+    })
     return result
   } catch (error) {
     logger.error('Database query error', {
@@ -49,8 +51,8 @@ export const query = async (text: string, params?: any[]) => {
 }
 
 /**
- * Get a client from the pool for transactions
- * @returns PostgreSQL client
+ * Borrow a dedicated client for multi-statement transactions.
+ * Callers MUST release it: `try { ... } finally { client.release() }`.
  */
 export const getClient = async () => {
   try {
@@ -63,9 +65,17 @@ export const getClient = async () => {
   }
 }
 
-/**
- * Close the database pool
- */
+/** Liveness probe for the health endpoint. */
+export const pingDatabase = async (): Promise<boolean> => {
+  try {
+    await pool.query('SELECT 1')
+    return true
+  } catch {
+    return false
+  }
+}
+
+/** Close the database pool (graceful shutdown). */
 export const closePool = async () => {
   try {
     await pool.end()
