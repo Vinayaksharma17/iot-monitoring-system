@@ -10,6 +10,7 @@ import {
   validateRefresh,
 } from '../validators/auth.validator.js'
 import { authenticateUser } from '../middleware/auth.middleware.js'
+import { authLimiter } from '../middleware/rate-limit.middleware.js'
 import { asyncHandler } from '../middleware/error.middleware.js'
 
 const router = express.Router()
@@ -21,16 +22,16 @@ const router = express.Router()
 /**
  * @route   POST /api/auth/login
  * @desc    Authenticate a user and issue access/refresh tokens
- * @access  Public
+ * @access  Public (rate limited; only failed attempts count)
  */
-router.post('/login', validateLogin, asyncHandler(login))
+router.post('/login', authLimiter, validateLogin, asyncHandler(login))
 
 /**
  * @route   POST /api/auth/refresh
  * @desc    Exchange a valid refresh token for a new access token
- * @access  Public
+ * @access  Public (rate limited; only failed attempts count)
  */
-router.post('/refresh', validateRefresh, asyncHandler(refresh))
+router.post('/refresh', authLimiter, validateRefresh, asyncHandler(refresh))
 
 /**
  * @route   POST /api/auth/logout

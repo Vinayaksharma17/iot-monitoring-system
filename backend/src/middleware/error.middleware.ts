@@ -2,33 +2,43 @@ import { Request, Response, NextFunction } from 'express'
 import { logger } from './logger.middleware.js'
 
 // ==========================================
-// Custom Error Class
+// Custom Error Classes
 // ==========================================
 
 /**
- * Custom application error class
+ * Operational (expected) application error. Message is safe to return
+ * to the client; stack traces never leave the server.
  */
 export class AppError extends Error {
-  public statusCode: number
-  public isOperational: boolean
+  public readonly statusCode: number
+  public readonly isOperational: boolean
 
-  constructor(message: string, statusCode: number = 500) {
+  constructor(message: string, statusCode = 500) {
     super(message)
     this.statusCode = statusCode
     this.isOperational = true
-
     Error.captureStackTrace(this, this.constructor)
   }
 }
-
-// ==========================================
-// Error Types
-// ==========================================
 
 export class ValidationError extends AppError {
   constructor(message: string) {
     super(message, 400)
     this.name = 'ValidationError'
+  }
+}
+
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Authentication required') {
+    super(message, 401)
+    this.name = 'UnauthorizedError'
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'Access denied') {
+    super(message, 403)
+    this.name = 'ForbiddenError'
   }
 }
 
@@ -54,101 +64,83 @@ export class DatabaseError extends AppError {
 }
 
 // ==========================================
-// Error Handler Middleware
+// Global Error Handler Middleware
 // ==========================================
 
-/**
- * Global error handler middleware
- */
+// PostgreSQL SQLSTATE codes we can map to meaningful client responses.
+// Anything else stays a generic 500 so internals are never leaked.
+const PG_ERROR_RESPONSES: Record<string, { statusCode: number; message: string }> = {
+  '23505': { statusCode: 409, message: 'Resource already exists' },
+  '23503': { statusCode: 400, message: 'Referenced resource does not exist' },
+  '23502': { statusCode: 400, message: 'Required field is missing' },
+  '23514': { statusCode: 400, message: 'Value violates a database constraint' },
+  '22P02': { statusCode: 400, message: 'Invalid data format' },
+  '22001': { statusCode: 400, message: 'Value is too long' },
+  '22003': { statusCode: 400, message: 'Numeric value is out of range' },
+}
+
 export const errorHandler = (
   err: Error | AppError,
   req: Request,
   res: Response,
   next: NextFunction
-) => {
-  // Default error values
+): void => {
+  // If the response was already partially sent (streaming, etc.) the
+  // only correct move is to delegate to Express' default handler.
+  if (res.headersSent) {
+    return next(err)
+  }
+
   let statusCode = 500
   let message = 'Internal Server Error'
-  let isOperational = false
 
-  // Check if it's an AppError
   if (err instanceof AppError) {
     statusCode = err.statusCode
     message = err.message
-    isOperational = err.isOperational
-  }
-
-  // Handle specific error types
-  if (err.name === 'ValidationError') {
-    statusCode = 400
-    message = err.message
-  }
-
-  if (err.name === 'JsonWebTokenError') {
+  } else if (err.name === 'JsonWebTokenError') {
     statusCode = 401
     message = 'Invalid token'
-  }
-
-  if (err.name === 'TokenExpiredError') {
+  } else if (err.name === 'TokenExpiredError') {
     statusCode = 401
     message = 'Token expired'
-  }
-
-  // PostgreSQL specific errors
-  if ('code' in err) {
-    const pgError = err as any
-
-    if (pgError.code === '23505') {
-      // Unique violation
-      statusCode = 409
-      message = 'Resource already exists'
-    }
-
-    if (pgError.code === '23503') {
-      // Foreign key violation
-      statusCode = 400
-      message = 'Referenced resource does not exist'
-    }
-
-    if (pgError.code === '23502') {
-      // Not null violation
-      statusCode = 400
-      message = 'Required field is missing'
-    }
-
-    if (pgError.code === '22P02') {
-      // Invalid text representation
-      statusCode = 400
-      message = 'Invalid data format'
+  } else if (err.name === 'ValidationError') {
+    statusCode = 400
+    message = err.message
+  } else {
+    // PostgreSQL SQLSTATE errors (DatabaseError is operational and handled above)
+    const code = (err as { code?: unknown }).code
+    if (typeof code === 'string' && PG_ERROR_RESPONSES[code]) {
+      statusCode = PG_ERROR_RESPONSES[code].statusCode
+      message = PG_ERROR_RESPONSES[code].message
     }
   }
 
-  // Log error
   if (statusCode >= 500) {
-    logger.error('Server Error:', {
+    logger.error('Unhandled server error', {
       message: err.message,
       stack: err.stack,
-      url: req.url,
+      url: req.originalUrl,
       method: req.method,
       ip: req.ip,
     })
   } else {
-    logger.warn('Client Error:', {
+    logger.warn('Request error', {
       message: err.message,
-      url: req.url,
+      url: req.originalUrl,
       method: req.method,
       statusCode,
     })
   }
 
-  // Send error response
-  const errorResponse: any = {
+  const errorResponse: Record<string, unknown> = {
     success: false,
     message,
-    ...(process.env.NODE_ENV === 'development' && {
-      error: err.message,
-      stack: err.stack,
-    }),
+  }
+
+  // Stack traces are exposed only in development, never in production.
+  if (process.env.NODE_ENV === 'development') {
+    errorResponse.error = err.message
+    errorResponse.stack = err.stack
   }
 
   res.status(statusCode).json(errorResponse)
@@ -158,16 +150,12 @@ export const errorHandler = (
 // 404 Handler
 // ==========================================
 
-/**
- * Handle 404 - Route not found
- */
 export const notFoundHandler = (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
-) => {
-  const error = new NotFoundError(`Route ${req.method} ${req.url} not found`)
-  next(error)
+): void => {
+  next(new NotFoundError(`Route ${req.method} ${req.originalUrl} not found`))
 }
 
 // ==========================================
@@ -175,12 +163,13 @@ export const notFoundHandler = (
 // ==========================================
 
 /**
- * Wrapper for async route handlers to catch errors
+ * Wraps async route handlers so rejected promises are forwarded to the
+ * global error handler instead of becoming unhandled rejections.
  */
-export const asyncHandler = (
-  fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
+export const asyncHandler = <T extends Request = Request>(
+  fn: (req: T, res: Response, next: NextFunction) => Promise<unknown>
 ) => {
-  return (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next)
+  return (req: Request, res: Response, next: NextFunction): void => {
+    Promise.resolve(fn(req as T, res, next)).catch(next)
   }
 }

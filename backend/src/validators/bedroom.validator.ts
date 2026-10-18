@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { Request, Response, NextFunction } from 'express'
+import { validateBody } from './validate.js'
 
 // ==========================================
 // Validation Schemas
@@ -9,7 +9,7 @@ import { Request, Response, NextFunction } from 'express'
  * Schema for creating a bedroom
  */
 export const createBedroomSchema = Joi.object({
-  name: Joi.string().min(2).max(100).required().messages({
+  name: Joi.string().trim().min(2).max(100).required().messages({
     'string.base': 'Name must be a string',
     'string.empty': 'Name is required',
     'string.min': 'Name must be at least 2 characters long',
@@ -26,7 +26,7 @@ export const createBedroomSchema = Joi.object({
  * Schema for updating a bedroom
  */
 export const updateBedroomSchema = Joi.object({
-  name: Joi.string().min(2).max(100).optional().messages({
+  name: Joi.string().trim().min(2).max(100).optional().messages({
     'string.base': 'Name must be a string',
     'string.min': 'Name must be at least 2 characters long',
     'string.max': 'Name must not exceed 100 characters',
@@ -45,60 +45,5 @@ export const updateBedroomSchema = Joi.object({
 // Validation Middleware
 // ==========================================
 
-/**
- * Middleware to validate request body against create bedroom schema
- */
-export const validateCreateBedroom = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const { error } = createBedroomSchema.validate(req.body, {
-    abortEarly: false,
-    stripUnknown: true,
-  })
-
-  if (error) {
-    const errors = error.details.map((detail) => ({
-      field: detail.path.join('.'),
-      message: detail.message,
-    }))
-
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors,
-    })
-  }
-
-  next()
-}
-
-/**
- * Middleware to validate request body against update bedroom schema
- */
-export const validateUpdateBedroom = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const { error } = updateBedroomSchema.validate(req.body, {
-    abortEarly: false,
-    stripUnknown: true,
-  })
-
-  if (error) {
-    const errors = error.details.map((detail) => ({
-      field: detail.path.join('.'),
-      message: detail.message,
-    }))
-
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors,
-    })
-  }
-
-  next()
-}
+export const validateCreateBedroom = validateBody(createBedroomSchema)
+export const validateUpdateBedroom = validateBody(updateBedroomSchema)

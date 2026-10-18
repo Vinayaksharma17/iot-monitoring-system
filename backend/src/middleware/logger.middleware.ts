@@ -1,5 +1,6 @@
 import winston from 'winston'
 import morgan from 'morgan'
+import { env } from '../config/env.js'
 
 // ==========================================
 // Winston Logger Configuration
@@ -16,14 +17,13 @@ const consoleFormat = printf(({ level, message, timestamp, stack }) => {
  * Winston logger instance
  */
 export const logger = winston.createLogger({
-  level: process.env.LOG_LEVEL || 'info',
+  level: env.logLevel,
   format: combine(
     errors({ stack: true }),
     timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     json()
   ),
   transports: [
-    // Console transport
     new winston.transports.Console({
       format: combine(
         colorize(),
@@ -31,17 +31,15 @@ export const logger = winston.createLogger({
         consoleFormat
       ),
     }),
-    // Error log file
     new winston.transports.File({
       filename: 'logs/error.log',
       level: 'error',
-      maxsize: 5242880, // 5MB
+      maxsize: 5_242_880, // 5MB
       maxFiles: 5,
     }),
-    // Combined log file
     new winston.transports.File({
       filename: 'logs/combined.log',
-      maxsize: 5242880, // 5MB
+      maxsize: 5_242_880, // 5MB
       maxFiles: 5,
     }),
   ],
@@ -74,45 +72,10 @@ export const morganMiddleware = morgan(
   {
     stream: morganStream,
     skip: (req) => {
-      // Skip logging for health check endpoint
+      // Skip logging for health check endpoint (frequent k8s/docker probes)
       return req.url === '/health'
     },
   }
 )
-
-// ==========================================
-// Helper Functions
-// ==========================================
-
-/**
- * Log database queries (for debugging)
- */
-export const logQuery = (query: string, params?: any[]) => {
-  if (process.env.NODE_ENV === 'development') {
-    logger.debug('Database Query:', {
-      query,
-      params,
-    })
-  }
-}
-
-/**
- * Log HTTP requests (for debugging)
- */
-export const logRequest = (
-  method: string,
-  url: string,
-  body?: any,
-  query?: any
-) => {
-  if (process.env.NODE_ENV === 'development') {
-    logger.debug('HTTP Request:', {
-      method,
-      url,
-      body,
-      query,
-    })
-  }
-}
 
 export default logger

@@ -19,34 +19,41 @@ import {
   requireApiKey,
 } from '../middleware/auth.middleware.js'
 import { validateNumericId } from '../validators/params.validator.js'
+import { validateQuery } from '../validators/validate.js'
+import { asyncHandler } from '../middleware/error.middleware.js'
+import Joi from 'joi'
 
 const router = express.Router()
 
 // ==========================================
 // Sensor Routes
 // ==========================================
+// Static/segmented paths are registered before the /:id parametric route
+// so future paths can never be shadowed by it.
+
+const listQuerySchema = Joi.object({
+  bedroomId: Joi.number().integer().min(1).max(2_147_483_647).optional(),
+})
 
 /**
  * @route   GET /api/sensors/active
  * @desc    Get all active sensors (for machine/ingestion clients such as Node-RED)
  * @access  Public, or protected by X-API-Key when INGEST_API_KEY is configured
- * @note    This route must come before /:id to avoid route conflicts
  */
-router.get('/active', requireApiKey, getActiveSensors)
+router.get('/active', requireApiKey, asyncHandler(getActiveSensors))
 
 /**
  * @route   GET /api/sensors
  * @desc    Get all sensors (active and inactive)
+ * @query   bedroomId (optional, positive integer)
  * @access  Protected (Authenticated users)
  */
-router.get('/', authenticateUser, getAllSensors)
-
-/**
- * @route   GET /api/sensors/:id
- * @desc    Get sensor by ID
- * @access  Protected (Authenticated users)
- */
-router.get('/:id', authenticateUser, validateNumericId('id'), getSensorById)
+router.get(
+  '/',
+  authenticateUser,
+  validateQuery(listQuerySchema),
+  asyncHandler(getAllSensors)
+)
 
 /**
  * @route   GET /api/sensors/bedrooms/:bedroomId
@@ -57,7 +64,7 @@ router.get(
   '/bedrooms/:bedroomId',
   authenticateUser,
   validateNumericId('bedroomId'),
-  getSensorsByBedroomId
+  asyncHandler(getSensorsByBedroomId)
 )
 
 /**
@@ -71,7 +78,19 @@ router.post(
   validateNumericId('bedroomId'),
   checkPermissions('write'),
   validateCreateSensor,
-  createSensor
+  asyncHandler(createSensor)
+)
+
+/**
+ * @route   GET /api/sensors/:id
+ * @desc    Get sensor by ID
+ * @access  Protected (Authenticated users)
+ */
+router.get(
+  '/:id',
+  authenticateUser,
+  validateNumericId('id'),
+  asyncHandler(getSensorById)
 )
 
 /**
@@ -85,7 +104,7 @@ router.put(
   validateNumericId('id'),
   checkPermissions('update'),
   validateUpdateSensor,
-  updateSensor
+  asyncHandler(updateSensor)
 )
 
 /**
@@ -98,7 +117,7 @@ router.delete(
   authenticateUser,
   validateNumericId('id'),
   authorizeRoles('admin'),
-  deleteSensor
+  asyncHandler(deleteSensor)
 )
 
 export default router

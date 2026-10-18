@@ -1,5 +1,5 @@
 import Joi from 'joi'
-import { Request, Response, NextFunction } from 'express'
+import { validateBody } from './validate.js'
 
 // ==========================================
 // Validation Schemas
@@ -9,7 +9,7 @@ import { Request, Response, NextFunction } from 'express'
  * Schema for creating a sensor
  */
 export const createSensorSchema = Joi.object({
-  name: Joi.string().min(2).max(100).required().messages({
+  name: Joi.string().trim().min(2).max(100).required().messages({
     'string.base': 'Name must be a string',
     'string.empty': 'Name is required',
     'string.min': 'Name must be at least 2 characters long',
@@ -21,7 +21,7 @@ export const createSensorSchema = Joi.object({
     'any.only': 'Type must be either "temperature" or "humidity"',
     'any.required': 'Type is required',
   }),
-  unit: Joi.string().required().messages({
+  unit: Joi.string().trim().min(1).max(10).required().messages({
     'string.base': 'Unit must be a string',
     'string.empty': 'Unit is required',
     'any.required': 'Unit is required',
@@ -44,7 +44,7 @@ export const createSensorSchema = Joi.object({
  * Schema for updating a sensor
  */
 export const updateSensorSchema = Joi.object({
-  name: Joi.string().min(2).max(100).optional().messages({
+  name: Joi.string().trim().min(2).max(100).optional().messages({
     'string.base': 'Name must be a string',
     'string.min': 'Name must be at least 2 characters long',
     'string.max': 'Name must not exceed 100 characters',
@@ -53,7 +53,7 @@ export const updateSensorSchema = Joi.object({
     'string.base': 'Type must be a string',
     'any.only': 'Type must be either "temperature" or "humidity"',
   }),
-  unit: Joi.string().optional().messages({
+  unit: Joi.string().trim().min(1).max(10).optional().messages({
     'string.base': 'Unit must be a string',
   }),
   minValue: Joi.number().optional().messages({
@@ -82,60 +82,5 @@ export const updateSensorSchema = Joi.object({
 // Validation Middleware
 // ==========================================
 
-/**
- * Middleware to validate request body against create sensor schema
- */
-export const validateCreateSensor = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const { error } = createSensorSchema.validate(req.body, {
-    abortEarly: false,
-    stripUnknown: true,
-  })
-
-  if (error) {
-    const errors = error.details.map((detail) => ({
-      field: detail.path.join('.'),
-      message: detail.message,
-    }))
-
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors,
-    })
-  }
-
-  next()
-}
-
-/**
- * Middleware to validate request body against update sensor schema
- */
-export const validateUpdateSensor = (
-  req: Request,
-  res: Response,
-  next: NextFunction
-) => {
-  const { error } = updateSensorSchema.validate(req.body, {
-    abortEarly: false,
-    stripUnknown: true,
-  })
-
-  if (error) {
-    const errors = error.details.map((detail) => ({
-      field: detail.path.join('.'),
-      message: detail.message,
-    }))
-
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors,
-    })
-  }
-
-  next()
-}
+export const validateCreateSensor = validateBody(createSensorSchema)
+export const validateUpdateSensor = validateBody(updateSensorSchema)

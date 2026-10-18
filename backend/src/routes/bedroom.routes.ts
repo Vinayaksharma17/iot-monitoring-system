@@ -16,6 +16,7 @@ import {
   checkPermissions,
 } from '../middleware/auth.middleware.js'
 import { validateNumericId } from '../validators/params.validator.js'
+import { asyncHandler } from '../middleware/error.middleware.js'
 
 const router = express.Router()
 
@@ -28,7 +29,7 @@ const router = express.Router()
  * @desc    Get all bedrooms
  * @access  Protected (Authenticated users)
  */
-router.get('/', authenticateUser, getAllBedrooms)
+router.get('/', authenticateUser, asyncHandler(getAllBedrooms))
 
 /**
  * @route   GET /api/bedrooms/:id
@@ -39,7 +40,7 @@ router.get(
   '/:id',
   authenticateUser,
   validateNumericId('id'),
-  getBedroomById
+  asyncHandler(getBedroomById)
 )
 
 /**
@@ -52,7 +53,7 @@ router.post(
   authenticateUser,
   checkPermissions('write'),
   validateCreateBedroom,
-  createBedroom
+  asyncHandler(createBedroom)
 )
 
 /**
@@ -66,7 +67,7 @@ router.put(
   validateNumericId('id'),
   checkPermissions('update'),
   validateUpdateBedroom,
-  updateBedroom
+  asyncHandler(updateBedroom)
 )
 
 /**
@@ -79,7 +80,7 @@ router.delete(
   authenticateUser,
   validateNumericId('id'),
   authorizeRoles('admin'),
-  deleteBedroom
+  asyncHandler(deleteBedroom)
 )
 
 export default router
