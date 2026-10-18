@@ -1,186 +1,109 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { authApi, setAuthToken, clearAuthToken } from '@/services/api'
-import type { AuthUser, LoginCredentials, LoginResponse } from '@/types'
+import {
+  readStoredAuth,
+  writeStoredAuth,
+  clearStoredAuth,
+} from '@/services/authStorage'
+import type { AuthUser, LoginCredentials } from '@/types'
 
-export type AuthState = {
+type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
+
+export type AuthContextValue = {
   user: AuthUser | null
-  accessToken: string | null
-  refreshToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
   error: string | null
-}
-
-type AuthContextValue = AuthState & {
   login: (credentials: LoginCredentials) => Promise<void>
   logout: () => void
-  refresh: () => Promise<void>
-}
-
-const initialState: AuthState = {
-  user: null,
-  accessToken: null,
-  refreshToken: null,
-  isAuthenticated: false,
-  isLoading: true,
-  error: null,
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-const AUTH_STORAGE_KEY = 'iot_auth'
-
-type StoredAuth = {
-  user: AuthUser
-  accessToken: string
-  refreshToken: string
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>(initialState)
-
-  const persistAuth = (payload: LoginResponse) => {
-    const { user, accessToken, refreshToken } = payload
-    const stored: StoredAuth = { user, accessToken, refreshToken }
-    try {
-      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(stored))
-    } catch {
-      // ignore storage errors
-    }
-    setAuthToken(accessToken)
-    setState({
-      user,
-      accessToken,
-      refreshToken,
-      isAuthenticated: true,
-      isLoading: false,
-      error: null,
-    })
-  }
-
-  const clearPersistedAuth = () => {
-    try {
-      localStorage.removeItem(AUTH_STORAGE_KEY)
-    } catch {
-      // ignore storage errors
-    }
-    clearAuthToken()
-  }
+  const [user, setUser] = useState<AuthUser | null>(null)
+  const [status, setStatus] = useState<AuthStatus>('loading')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Hydrate from localStorage on mount
-    try {
-      const raw = localStorage.getItem(AUTH_STORAGE_KEY)
-      if (!raw) {
-        setState((prev) => ({ ...prev, isLoading: false }))
-        return
-      }
-
-      const parsed: StoredAuth = JSON.parse(raw)
-      if (parsed.accessToken) {
-        setAuthToken(parsed.accessToken)
-        setState({
-          user: parsed.user,
-          accessToken: parsed.accessToken,
-          refreshToken: parsed.refreshToken,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        })
-        // Optionally validate current user
-        authApi
-          .me()
-          .then((user) => {
-            setState((prev) => ({
-              ...prev,
-              user,
-              isAuthenticated: true,
-              isLoading: false,
-            }))
-          })
-          .catch(() => {
-            // If token is invalid, clear session silently
-            clearPersistedAuth()
-            setState({
-              ...initialState,
-              isLoading: false,
-            })
-          })
-        return
-      }
-    } catch {
-      // ignore hydration errors
+    const stored = readStoredAuth()
+    if (!stored) {
+      setStatus('unauthenticated')
+      return
     }
-    setState((prev) => ({ ...prev, isLoading: false }))
+
+    setAuthToken(stored.accessToken)
+    setUser(stored.user)
+    setStatus('authenticated')
+
+    // Re-validate the cached user in the background (the axios interceptor
+    // transparently refreshes an expired access token if possible).
+    authApi
+      .me()
+      .then((freshUser) => setUser(freshUser))
+      .catch(() => {
+        // Session could not be recovered; the interceptor has already
+        // redirected to /login if a hard session end occurred.
+        clearAuthToken()
+        setUser(null)
+        setStatus('unauthenticated')
+      })
   }, [])
 
-  const login = async (credentials: LoginCredentials) => {
-    setState((prev) => ({ ...prev, isLoading: true, error: null }))
+  const login = useCallback(async (credentials: LoginCredentials) => {
+    setError(null)
     try {
       const data = await authApi.login(credentials)
-      persistAuth(data)
+      writeStoredAuth(data)
+      setAuthToken(data.accessToken)
+      setUser(data.user)
+      setStatus('authenticated')
     } catch (err) {
-      clearPersistedAuth()
+      clearStoredAuth()
+      clearAuthToken()
+      setUser(null)
+      setStatus('unauthenticated')
       const message =
         err instanceof Error ? err.message : 'Login failed. Please try again.'
-      setState({
-        ...initialState,
-        isLoading: false,
-        error: message,
-      })
+      setError(message)
       throw err
     }
-  }
+  }, [])
 
-  const refresh = async () => {
-    if (!state.refreshToken) {
-      throw new Error('No refresh token available')
-    }
-    try {
-      const tokens = await authApi.refresh(state.refreshToken)
-      setAuthToken(tokens.accessToken)
-      setState((prev) => ({
-        ...prev,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-        isAuthenticated: true,
-        isLoading: false,
-      }))
-      try {
-        localStorage.setItem(
-          AUTH_STORAGE_KEY,
-          JSON.stringify({
-            user: state.user,
-            accessToken: tokens.accessToken,
-            refreshToken: tokens.refreshToken,
-          })
-        )
-      } catch {
-        // ignore
-      }
-    } catch (err) {
-      clearPersistedAuth()
-      setState({
-        ...initialState,
-        isLoading: false,
-      })
-      throw err
-    }
-  }
-
-  const logout = () => {
-    clearPersistedAuth()
-    setState({ ...initialState, isLoading: false })
-  }
+  const logout = useCallback(() => {
+    authApi.logout().catch(() => {
+      // best effort; local session is cleared regardless
+    })
+    clearStoredAuth()
+    clearAuthToken()
+    setUser(null)
+    setError(null)
+    setStatus('unauthenticated')
+  }, [])
 
   const value = useMemo<AuthContextValue>(
-    () => ({ ...state, login, logout, refresh }),
-    [state]
+    () => ({
+      user,
+      isAuthenticated: status === 'authenticated',
+      isLoading: status === 'loading',
+      error,
+      login,
+      logout,
+    }),
+    [user, status, error, login, logout]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
   const ctx = useContext(AuthContext)
   if (!ctx) {

@@ -7,11 +7,13 @@ export interface Bedroom {
   updatedAt: string
 }
 
+export type SensorType = 'temperature' | 'humidity'
+
 export interface Sensor {
   id: number
   bedroomId: number
   name: string
-  type: string
+  type: SensorType
   unit: string
   minValue: number | string | null
   maxValue: number | string | null
@@ -63,7 +65,7 @@ export interface UpdateBedroomInput {
 
 export interface CreateSensorInput {
   name: string
-  type: string
+  type: SensorType
   unit: string
   minValue: number
   maxValue: number
@@ -72,14 +74,14 @@ export interface CreateSensorInput {
 
 export interface UpdateSensorInput {
   name?: string
-  type?: string
+  type?: SensorType
   unit?: string
   minValue?: number
   maxValue?: number
   isActive?: boolean
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean
   data: T
   message?: string

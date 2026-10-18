@@ -1,14 +1,25 @@
+import { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { Layout } from '@/components/layout/Layout'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
-import { Dashboard } from '@/pages/Dashboard'
-import { Bedrooms } from '@/pages/Bedrooms'
-import { Sensors } from '@/pages/Sensors'
-import { Login } from '@/pages/Login'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
+import { LoadingSpinner } from '@/components/common/LoadingSpinner'
 
-// Create a client
+const Dashboard = lazy(() =>
+  import('@/pages/Dashboard').then((m) => ({ default: m.Dashboard }))
+)
+const Bedrooms = lazy(() =>
+  import('@/pages/Bedrooms').then((m) => ({ default: m.Bedrooms }))
+)
+const Sensors = lazy(() =>
+  import('@/pages/Sensors').then((m) => ({ default: m.Sensors }))
+)
+const Login = lazy(() =>
+  import('@/pages/Login').then((m) => ({ default: m.Login }))
+)
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -19,48 +30,39 @@ const queryClient = new QueryClient({
   },
 })
 
+const PageFallback = (
+  <div className="flex items-center justify-center h-64">
+    <LoadingSpinner size="lg" />
+  </div>
+)
+
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Dashboard />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/bedrooms"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Bedrooms />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/sensors"
-              element={
-                <ProtectedRoute>
-                  <Layout>
-                    <Sensors />
-                  </Layout>
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <BrowserRouter>
+            <Suspense fallback={PageFallback}>
+              <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route
+                  element={
+                    <ProtectedRoute>
+                      <Layout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route path="/" element={<Dashboard />} />
+                  <Route path="/bedrooms" element={<Bedrooms />} />
+                  <Route path="/sensors" element={<Sensors />} />
+                </Route>
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </BrowserRouter>
+        </AuthProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   )
 }
 

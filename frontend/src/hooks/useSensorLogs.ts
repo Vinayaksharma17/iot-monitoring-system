@@ -16,6 +16,7 @@ export function useLatestSensorLogs() {
     queryKey: sensorLogKeys.latest,
     queryFn: sensorLogApi.getLatest,
     refetchInterval: 5000, // Refetch every 5 seconds for real-time updates
+    refetchIntervalInBackground: false,
   })
 }
 
@@ -31,5 +32,6 @@ export function useSensorLogsBySensor(
     queryFn: () => sensorLogApi.getBySensor(sensorId!, limit),
     enabled: sensorId !== null,
     refetchInterval: 5000, // Refetch every 5 seconds
+    refetchIntervalInBackground: false,
   })
 }

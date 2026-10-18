@@ -1,4 +1,10 @@
 import axios from 'axios'
+import type { AxiosError, InternalAxiosRequestConfig } from 'axios'
+import {
+  readStoredAuth,
+  patchStoredTokens,
+  clearStoredAuth,
+} from '@/services/authStorage'
 import type {
   Bedroom,
   Sensor,
@@ -14,7 +20,16 @@ import type {
   TokenResponse,
 } from '@/types'
 
-// Create axios instance
+export class ApiError extends Error {
+  readonly status?: number
+
+  constructor(message: string, status?: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 10000,
@@ -33,63 +48,106 @@ export const clearAuthToken = () => {
   accessToken = null
 }
 
-const getErrorMessage = (error: any): string => {
-  return (
-    error?.response?.data?.message ||
-    error?.message ||
-    'An unexpected error occurred'
-  )
+const getErrorMessage = (error: unknown): string => {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data as { message?: string } | undefined
+    return data?.message || error.message || 'An unexpected error occurred'
+  }
+  if (error instanceof Error) return error.message
+  return 'An unexpected error occurred'
 }
 
-// Request interceptor
-axiosInstance.interceptors.request.use(
-  (config) => {
-    if (accessToken) {
-      config.headers = config.headers || {}
-      config.headers.Authorization = `Bearer ${accessToken}`
-    }
-    if (import.meta.env.DEV) {
-      console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`)
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
+const isAuthUrl = (url: string): boolean =>
+  url.includes('/auth/login') ||
+  url.includes('/auth/refresh') ||
+  url.includes('/auth/logout')
+
+let redirectingToLogin = false
+
+const endSessionAndRedirect = () => {
+  accessToken = null
+  clearStoredAuth()
+  if (!redirectingToLogin && window.location.pathname !== '/login') {
+    redirectingToLogin = true
+    window.location.assign('/login')
   }
-)
+}
 
-const AUTH_STORAGE_KEY = 'iot_auth'
+// Single-flight refresh: concurrent 401s share one /auth/refresh round-trip.
+let refreshPromise: Promise<string> | null = null
 
-// Response interceptor
+const refreshSession = (): Promise<string> => {
+  if (!refreshPromise) {
+    refreshPromise = (async () => {
+      const stored = readStoredAuth()
+      if (!stored?.refreshToken) {
+        throw new ApiError('No refresh token available')
+      }
+      const tokens = await rawAuthRefresh(stored.refreshToken)
+      patchStoredTokens(tokens)
+      accessToken = tokens.accessToken
+      return tokens.accessToken
+    })().finally(() => {
+      refreshPromise = null
+    })
+  }
+  return refreshPromise
+}
+
+axiosInstance.interceptors.request.use((config) => {
+  if (accessToken) {
+    config.headers.set('Authorization', `Bearer ${accessToken}`)
+  }
+  if (import.meta.env.DEV) {
+    console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`)
+  }
+  return config
+})
+
+type RetriableConfig = InternalAxiosRequestConfig & { _retry?: boolean }
+
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error) => {
-    const status = error?.response?.status
-    const url: string = error?.config?.url || ''
+  async (error: AxiosError) => {
+    const config = error.config as RetriableConfig | undefined
+    const status = error.response?.status
 
-    // On expired/invalid credentials, clear the session and return to login.
-    // (Skip endpoints where a 401 is an expected result, e.g. bad login.)
-    if (status === 401 && !url.includes('/auth/login')) {
-      clearAuthToken()
+    if (
+      status === 401 &&
+      config &&
+      !config._retry &&
+      config.url &&
+      !isAuthUrl(config.url)
+    ) {
+      config._retry = true
       try {
-        localStorage.removeItem(AUTH_STORAGE_KEY)
-      } catch {
-        // ignore storage errors
-      }
-      if (window.location.pathname !== '/login') {
-        window.location.assign('/login')
+        const token = await refreshSession()
+        config.headers.set('Authorization', `Bearer ${token}`)
+        return axiosInstance(config)
+      } catch (refreshError) {
+        endSessionAndRedirect()
+        throw new ApiError(getErrorMessage(refreshError), status)
       }
     }
 
     if (import.meta.env.DEV) {
       console.error('[API Error]', error.response?.data || error.message)
     }
-    const message = getErrorMessage(error)
-    return Promise.reject(new Error(message))
+    throw new ApiError(getErrorMessage(error), status)
   }
 )
 
-// Auth API
+// Auth API (raw refresh bypasses the interceptor to avoid recursion)
+const rawAuthRefresh = async (
+  refreshToken: string
+): Promise<TokenResponse> => {
+  const response = await axiosInstance.post<ApiResponse<TokenResponse>>(
+    '/auth/refresh',
+    { refreshToken }
+  )
+  return response.data.data
+}
+
 export const authApi = {
   login: async (credentials: LoginCredentials): Promise<LoginResponse> => {
     const response = await axiosInstance.post<ApiResponse<LoginResponse>>(
@@ -102,13 +160,7 @@ export const authApi = {
     const response = await axiosInstance.get<ApiResponse<AuthUser>>('/auth/me')
     return response.data.data
   },
-  refresh: async (refreshToken: string): Promise<TokenResponse> => {
-    const response = await axiosInstance.post<ApiResponse<TokenResponse>>(
-      '/auth/refresh',
-      { refreshToken }
-    )
-    return response.data.data
-  },
+  refresh: refreshSession,
   logout: async (): Promise<void> => {
     await axiosInstance.post('/auth/logout')
   },

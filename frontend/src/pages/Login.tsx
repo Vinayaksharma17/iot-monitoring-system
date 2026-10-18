@@ -1,21 +1,14 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { Navigate, useLocation } from 'react-router-dom'
-import { useAuth } from '@/contexts/AuthContext'
-import { LoadingSpinner } from '@/components/common/LoadingSpinner'
-import { Button } from '@/components/common/Button'
 import { BarChart3 } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
+import { Button } from '@/components/common/Button'
+import { loginSchema, type LoginFormData } from '@/validation/schemas'
 
-const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, 'Email is required')
-    .email('Enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-})
-
-type LoginFormData = z.infer<typeof loginSchema>
+type LoginLocationState = {
+  from?: { pathname?: string }
+}
 
 export function Login() {
   const { login, isAuthenticated, isLoading, error } = useAuth()
@@ -30,7 +23,8 @@ export function Login() {
     defaultValues: { email: '', password: '' },
   })
 
-  const from = (location.state as any)?.from?.pathname || '/'
+  const from =
+    (location.state as LoginLocationState | null)?.from?.pathname || '/'
 
   if (isAuthenticated && !isLoading) {
     return <Navigate to={from} replace />
@@ -43,6 +37,8 @@ export function Login() {
       // error stored in context
     }
   }
+
+  const submitting = isSubmitting || isLoading
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -113,17 +109,10 @@ export function Login() {
           <Button
             type="submit"
             className="w-full"
-            isLoading={isSubmitting || isLoading}
-            disabled={isSubmitting || isLoading}
+            isLoading={submitting}
+            disabled={submitting}
           >
-            {isSubmitting || isLoading ? (
-              <span className="flex items-center justify-center">
-                <LoadingSpinner size="sm" className="mr-2" />
-                Signing in...
-              </span>
-            ) : (
-              'Sign In'
-            )}
+            Sign In
           </Button>
         </form>
       </div>
