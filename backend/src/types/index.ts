@@ -194,3 +194,34 @@ export interface StatisticsQueryParams {
   roomName?: string
   sensorName?: string
 }
+
+/**
+ * Query parameters for listing sensors
+ */
+export interface SensorListQueryParams {
+  bedroomId?: number
+}
+
+// ==========================================
+// Auth Types
+// ==========================================
+
+/**
+ * User shape returned by the API (password hash never included)
+ */
+export interface PublicUser {
+  id: number
+  email: string
+  role: 'admin' | 'viewer'
+  isActive: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
+/**
+ * Issued token pair returned by login/refresh
+ */
+export interface TokenPair {
+  accessToken: string
+  refreshToken: string
+}
