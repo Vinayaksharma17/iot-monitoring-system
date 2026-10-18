@@ -12,11 +12,13 @@ import { format } from 'date-fns'
 // toggle), so viewers of the embedded dashboards cannot navigate to the
 // Grafana admin area. Dashboards are served read-only via anonymous Viewer
 // access configured on the Grafana service.
+
 const GRAFANA_DASHBOARDS = {
   allBedrooms:
-    'http://localhost:3001/d/f2499d5f-f11b-447e-b9b1-385f2f79b302/all-bedrooms-real-time-overview?orgId=1&refresh=5s',
+    'http://localhost:3001/d/f2499d5f-f11b-447e-b9b1-385f2f79b302/all-bedrooms-real-time-overview?orgId=1&refresh=5s&kiosk',
+
   singleBedroom:
-    'http://localhost:3001/d/dd58271e-9e62-43f7-92f2-e9dfe36634d5/single-bedroom-dashboard?orgId=1&refresh=30s&var-bedroom_id=1',
+    'http://localhost:3001/d/dd58271e-9e62-43f7-92f2-e9dfe36634d5/single-bedroom-dashboard?orgId=1&refresh=30s&kiosk=tv',
 }
 
 export function Dashboard() {
