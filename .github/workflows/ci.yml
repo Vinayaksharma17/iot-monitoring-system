@@ -1,0 +1,227 @@
+name: CI
+
+# Validates every change before it can be published:
+#   - backend & frontend lint + production build (TypeScript type-check)
+#   - Node-RED config/flow syntax + lockfile consistency
+#   - deploy scripts (shellcheck + syntax)
+#   - Docker Compose merge validity for dev and production
+#   - all three images actually build
+# No tests exist in this repository yet; when they are added, wire them into the
+# backend/frontend jobs instead of adding a separate job.
+
+on:
+  push:
+    branches: [main, develop, 'release/**']
+  pull_request:
+    branches: [main, develop, 'release/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # This workflow also lives on branches whose trees do not yet contain every
+  # path the jobs below need (e.g. `develop` before the v1.0.0 work merges).
+  # Instead of going red, the precheck reports a notice and the dependent jobs
+  # are skipped. Once the missing paths land on the branch, CI runs in full.
+  precheck:
+    name: Tree prerequisites
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.check.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: check
+        run: |
+          required=(
+            backend/package-lock.json
+            backend/.eslintrc.cjs
+            frontend/package-lock.json
+            node-red/package-lock.json
+            node-red/entrypoint.sh
+            deploy/deploy.sh
+            deploy/backup.sh
+            deploy/generate-env.sh
+            compose.production.yaml
+            compose.admin.yaml
+          )
+          missing=()
+          for f in "${required[@]}"; do
+            [ -f "$f" ] || missing+=("$f")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::notice title=CI prerequisites missing::${missing[*]}"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  backend:
+    name: Backend (lint + build)
+    needs: [precheck]
+    if: needs.precheck.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - name: Install (clean, reproducible)
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type-check and build
+        run: npm run build
+
+  frontend:
+    name: Frontend (lint + build)
+    needs: [precheck]
+    if: needs.precheck.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install (clean, reproducible)
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type-check and build (production, Grafana disabled)
+        run: npm run build
+        env:
+          VITE_API_URL: /api
+          VITE_GRAFANA_URL: ''
+
+  node-red:
+    name: Node-RED (flows + lockfile)
+    needs: [precheck]
+    if: needs.precheck.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: node-red
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Lockfile is in sync with package.json
+        run: npm ci --ignore-scripts
+      - name: settings.js syntax
+        run: node --check settings.js
+      - name: flows.json is valid JSON and free of hardcoded credentials
+        run: |
+          node -e "
+            const fs = require('fs');
+            const flows = JSON.parse(fs.readFileSync('flows.json', 'utf8'));
+            const text = fs.readFileSync('flows.json', 'utf8');
+            const banned = ['iot_password', 'iot_user'];
+            for (const b of banned) {
+              if (text.includes(b)) { console.error('flows.json still contains hardcoded value: ' + b); process.exit(1); }
+            }
+            const pg = flows.find((n) => n.type === 'postgreSQLConfig');
+            if (!pg) { console.error('postgreSQLConfig node missing'); process.exit(1); }
+            for (const f of ['host', 'database', 'user', 'password']) {
+              if (pg[f + 'FieldType'] !== 'env') { console.error(f + ' must use env field type'); process.exit(1); }
+            }
+            const hasApiKey = flows.some((n) => n.type === 'change' && JSON.stringify(n.rules || []).includes('X-API-Key'));
+            if (!hasApiKey) { console.error('no node sets the X-API-Key header'); process.exit(1); }
+            console.log('flows.json OK');
+          "
+      - name: entrypoint.sh syntax
+        run: bash -n entrypoint.sh
+
+  scripts:
+    name: Deploy scripts
+    needs: [precheck]
+    if: needs.precheck.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax check
+        run: |
+          for f in deploy/*.sh; do bash -n "$f"; done
+      - name: Shellcheck
+        run: shellcheck -S warning deploy/*.sh
+
+  compose:
+    name: Compose config (dev + production merges)
+    needs: [precheck]
+    if: needs.precheck.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: dummy-password
+      GRAFANA_ADMIN_PASSWORD: dummy-password
+      PUBLIC_ORIGIN: https://example.invalid
+      TAILSCALE_IP: 100.64.0.1
+      NODE_RED_ADMIN_PASSWORD_HASH: ''
+      NODE_RED_CREDENTIAL_SECRET: dummy
+      INGEST_API_KEY: dummy
+      JWT_SECRET: dummy
+      JWT_REFRESH_SECRET: dummy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Development stack
+        run: docker compose -f compose.yaml config -q
+      - name: Production stack
+        run: docker compose -f compose.yaml -f compose.production.yaml config -q
+      - name: Production + admin tooling
+        run: docker compose -f compose.yaml -f compose.production.yaml -f compose.admin.yaml --profile tools config -q
+      - name: Production stack excludes Adminer by default
+        run: |
+          services="$(docker compose -f compose.yaml -f compose.production.yaml config --services)"
+          echo "$services"
+          if grep -qx adminer <<<"$services"; then
+            echo "Adminer must not start in a normal production deploy" >&2
+            exit 1
+          fi
+
+  images:
+    name: Image build (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    needs: [precheck, backend, frontend]
+    if: needs.precheck.outputs.ready == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: ./backend
+            build_args: ''
+          - name: frontend
+            context: ./frontend
+            build_args: |
+              VITE_API_URL=/api
+              VITE_GRAFANA_URL=
+          - name: nodered
+            context: ./node-red
+            build_args: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,scope=${{ matrix.name }},mode=max
+          build-args: ${{ matrix.build_args }}
