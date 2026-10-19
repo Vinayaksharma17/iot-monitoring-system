@@ -1,0 +1,28 @@
+# Dependencies (installed inside the image with npm ci)
+node_modules
+npm-debug.log*
+
+# Local runtime state (persisted in the /data volume/bind mount)
+.config.runtime.json
+.config.nodes.json
+.sessions.json
+.flows.json.backup
+flows_cred.json
+context/
+lib/
+nodes/
+
+# Environment / secrets
+.env
+.env.*
+*.pem
+*.key
+
+# OS / IDE
+.DS_Store
+.vscode
+.idea
+*.swp
+
+# Note: package.json, package-lock.json, settings.js, flows.json and
+# entrypoint.sh are all required by the build and must NOT be excluded.

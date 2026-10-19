@@ -34,14 +34,22 @@ const readInt = (
   return parsed
 }
 
-const readBool = (name: string, fallback: boolean): boolean => {
+const readFloat = (
+  name: string,
+  fallback: number,
+  min: number,
+  max: number
+): number => {
   const raw = process.env[name]
   if (raw === undefined || raw === '') return fallback
-  if (raw === 'true' || raw === '1') return true
-  if (raw === 'false' || raw === '0') return false
-  throw new Error(
-    `Environment variable ${name} must be "true"/"false" or "1"/"0" (received "${raw}")`
-  )
+
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    throw new Error(
+      `Environment variable ${name} must be a number between ${min} and ${max} (received "${raw}")`
+    )
+  }
+  return parsed
 }
 
 // ------------------------------------------
@@ -183,6 +191,19 @@ export const env = {
   rateLimitMax: readInt('RATE_LIMIT_MAX', 300, 1, 100_000),
   authRateLimitWindowMs: readInt('AUTH_RATE_LIMIT_WINDOW_MS', 900_000, 1000, 3_600_000),
   authRateLimitMax: readInt('AUTH_RATE_LIMIT_MAX', 10, 1, 10_000),
+
+  // Data retention: keep sensor_logs within a fixed disk budget.
+  // RETENTION_MAX_SIZE_GB=0 disables the job entirely.
+  retentionMaxSizeGb: readFloat('RETENTION_MAX_SIZE_GB', 5, 0, 100),
+  retentionCheckIntervalMinutes: readInt(
+    'RETENTION_CHECK_INTERVAL_MINUTES',
+    60,
+    1,
+    1440
+  ),
+  // Measured cost of one sensor_logs row including all indexes
+  // (live demo DB: 243 B/row). Raise if your room/sensor names are long.
+  retentionBytesPerRow: readInt('RETENTION_BYTES_PER_ROW', 240, 50, 10_000),
 } as const
 
 // ------------------------------------------

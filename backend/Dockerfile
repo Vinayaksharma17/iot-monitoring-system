@@ -13,11 +13,12 @@ WORKDIR /app
 # Install build dependencies
 RUN apk add --no-cache python3 make g++
 
-# Copy package files
+# Copy package files (package-lock.json is required for a reproducible npm ci)
 COPY package*.json ./
 
-# Install all dependencies (including dev dependencies for building)
-RUN npm install
+# Install all dependencies (including dev dependencies for building),
+# deterministically from package-lock.json
+RUN npm ci
 
 # Copy source code
 COPY . .
@@ -26,7 +27,7 @@ COPY . .
 RUN npm run build
 
 # Remove dev dependencies
-RUN npm prune --production
+RUN npm prune --omit=dev
 
 # ==========================================
 # Stage 2: Production
@@ -43,8 +44,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install production dependencies only
-RUN npm install --omit=dev && \
+# Install production dependencies only, deterministically from the lockfile
+RUN npm ci --omit=dev && \
     npm cache clean --force
 
 # Copy built application from builder stage
@@ -60,9 +61,10 @@ USER nodeuser
 # Expose port
 EXPOSE 3000
 
-# Health check
+# Health check (compose provides its own; this keeps the raw image sane).
+# 127.0.0.1 avoids the IPv6/IPv4 localhost ambiguity inside containers.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"
+  CMD node -e "require('http').get('http://127.0.0.1:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1); })"
 
 # Start application
 CMD ["node", "dist/index.js"]

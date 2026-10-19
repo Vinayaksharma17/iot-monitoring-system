@@ -1,0 +1,32 @@
+# Optional admin overlay: temporarily publish the administrative UIs on the
+# private Tailscale interface so they are reachable from the tailnet (or
+# through an SSH port-forward) but never from the public internet.
+#
+# Usage (on the server, from the repo checkout):
+#   docker compose -f compose.yaml -f compose.production.yaml -f compose.admin.yaml \
+#     --profile tools up -d
+#   # ... do admin work ...
+#   docker compose -f compose.yaml -f compose.production.yaml up -d   # back to normal
+#
+# Prerequisite: TAILSCALE_IP (the host's tailnet address, 100.x.y.z) must be set
+# in deploy/.env. The interpolations fail loudly if it is missing.
+
+services:
+  postgres:
+    ports: !override
+      - '${TAILSCALE_IP:?set TAILSCALE_IP in deploy/.env}:${POSTGRES_PORT:-5432}:5432'
+
+  nodered:
+    ports: !override
+      - '${TAILSCALE_IP}:${NODERED_PORT:-1880}:1880'
+
+  grafana:
+    ports: !override
+      - '${TAILSCALE_IP}:${GRAFANA_PORT:-3001}:3000'
+
+  adminer:
+    # Same override is repeated so the port change applies whenever this file is
+    # used; `--profile tools` still decides whether Adminer actually starts.
+    profiles: ['tools']
+    ports: !override
+      - '${TAILSCALE_IP}:${ADMINER_PORT:-8080}:8080'

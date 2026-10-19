@@ -91,16 +91,29 @@ module.exports = {
   // ==========================================
   // Security Configuration
   // ==========================================
-  
-  // Uncomment the following to enable security
-  // adminAuth: {
-  //   type: "credentials",
-  //   users: [{
-  //     username: "admin",
-  //     password: "$2a$08$zZWtXTja0fB1pzD4sHCMyOCMYz2Z6dNbM6tl8sJogENOMcxWV9DN.",
-  //     permissions: "*"
-  //   }]
-  // },
+
+  // The editor must never be reachable without authentication. Credentials
+  // are supplied at runtime via environment variables so no secret is ever
+  // committed:
+  //   NODE_RED_ADMIN_USER           (default: "admin")
+  //   NODE_RED_ADMIN_PASSWORD_HASH  bcrypt hash (see deploy/generate-env.sh)
+  // When the hash is missing the login can never succeed, which fails safe
+  // (the editor stays inaccessible) rather than opening up.
+  adminAuth: {
+    type: 'credentials',
+    users: [
+      {
+        username: process.env.NODE_RED_ADMIN_USER || 'admin',
+        password: process.env.NODE_RED_ADMIN_PASSWORD_HASH,
+        permissions: '*'
+      }
+    ]
+  },
+
+  // Encrypts stored credentials (e.g. the flows_cred.json file). Set from the
+  // environment so the key does not live in the image or in this file.
+  // Generate with: openssl rand -hex 32
+  credentialSecret: process.env.NODE_RED_CREDENTIAL_SECRET,
   
   // ==========================================
   // Additional Settings
@@ -112,8 +125,10 @@ module.exports = {
   // Maximum message size (bytes)
   apiMaxLength: '5mb',
   
-  // Disable Node-RED editor (set to true in production)
-  disableEditor: false,
+  // Editor stays enabled but is only reachable over the private Tailscale
+  // network (never through the public reverse proxy). Set
+  // NODE_RED_DISABLE_EDITOR=true to run the committed flows read-only instead.
+  disableEditor: process.env.NODE_RED_DISABLE_EDITOR === 'true',
   
   // Enable verbose logging
   verbose: false

@@ -1,0 +1,121 @@
+name: Deploy to production
+
+# Deploys the home server over the tailnet over strict SSH.
+#
+# Triggers:
+#   1. Manually (workflow_dispatch) with an explicit image tag - the normal path.
+#   2. Automatically after "Publish images" succeeds for a v* tag.
+#
+# The "production" environment can be configured in the repo settings to require
+# manual approval before the deploy job runs.
+#
+# Required repository configuration (Settings > Secrets and variables > Actions):
+#   Secrets: TS_OAUTH_CLIENT_ID, TS_OAUTH_SECRET   (Tailscale OAuth client)
+#            DEPLOY_SSH_KEY                        (private ed25519 key)
+#            DEPLOY_KNOWN_HOSTS                    (pinned host key line)
+#   Variables: DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH, PUBLIC_HOSTNAME
+#
+# The image tag is never rebuilt here: images are always the immutable
+# artifacts produced by the publish workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Image tag to deploy (e.g. v1.0.0 or sha-1a2b3c4)'
+        required: true
+      rollback:
+        description: 'Roll back to the previously deployed tag instead'
+        type: boolean
+        default: false
+  workflow_run:
+    workflows: ['Publish images']
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       startsWith(github.event.workflow_run.head_branch, 'v'))
+    environment:
+      name: production
+      url: https://${{ vars.PUBLIC_HOSTNAME }}
+    steps:
+      - name: Resolve image tag
+        id: tag
+        env:
+          EVENT: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.image_tag }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [[ "$EVENT" == "workflow_dispatch" ]]; then
+            tag="$INPUT_TAG"
+          else
+            tag="$RUN_BRANCH"
+          fi
+          [[ -n "$tag" ]] || { echo "No image tag resolved" >&2; exit 1; }
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Deploying tag: $tag"
+
+      - name: Connect to tailnet
+        uses: tailscale/github-action@v3
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+
+      - name: Install deploy key and pinned host key
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          printf '%s\n' "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Check SSH connectivity
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+          USER: ${{ vars.DEPLOY_USER }}
+        run: |
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            -i ~/.ssh/id_ed25519 "$USER@$HOST" 'echo connected'
+
+      - name: Deploy on server
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+          USER: ${{ vars.DEPLOY_USER }}
+          REMOTE_PATH: ${{ vars.DEPLOY_PATH }}
+          TAG: ${{ steps.tag.outputs.tag }}
+          ROLLBACK: ${{ inputs.rollback }}
+        run: |
+          set -euo pipefail
+          if [[ "$ROLLBACK" == "true" ]]; then
+            REMOTE_CMD="./deploy/deploy.sh --rollback-previous"
+            echo "Requested rollback to the previously deployed tag"
+          else
+            REMOTE_CMD="git fetch --tags --prune && git checkout --detach '$TAG' && ./deploy/deploy.sh '$TAG'"
+          fi
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            -i ~/.ssh/id_ed25519 "$USER@$HOST" \
+            "cd '$REMOTE_PATH' && $REMOTE_CMD"
+
+      - name: Best-effort public check
+        # Datacenter IPs may be challenged by Cloudflare, so this does not fail
+        # the run; the authoritative health checks happen inside deploy.sh.
+        env:
+          PUBLIC_HOSTNAME: ${{ vars.PUBLIC_HOSTNAME }}
+        run: |
+          code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://${PUBLIC_HOSTNAME}/" || true)"
+          echo "https://${PUBLIC_HOSTNAME}/ -> ${code:-no-response}"

@@ -23,6 +23,7 @@ A full-stack IoT monitoring system for tracking temperature and humidity sensors
 - [Usage](#usage)
 - [API Documentation](#api-documentation)
 - [Project Structure](#project-structure)
+- [Production Deployment](#-production-deployment)
 - [Contributing](#contributing)
 
 ## 🏗️ Architecture
@@ -75,7 +76,7 @@ A full-stack IoT monitoring system for tracking temperature and humidity sensors
 ## 📦 Prerequisites
 
 - Docker (20.10+)
-- Docker Compose (2.0+)
+- Docker Compose (2.0+ for local development; **2.24+ for the production overlay**)
 - Git
 
 ## 🚀 Installation
@@ -84,6 +85,11 @@ A full-stack IoT monitoring system for tracking temperature and humidity sensors
 # Clone repository
 git clone https://github.com/Vinayaksharma17/iot-monitoring-system.git
 cd iot-monitoring-system
+
+# Create your environment file and set real secrets
+cp .env.example .env
+# Required: POSTGRES_PASSWORD, GRAFANA_ADMIN_PASSWORD, JWT_SECRET,
+# JWT_REFRESH_SECRET, NODE_RED_ADMIN_PASSWORD_HASH, NODE_RED_CREDENTIAL_SECRET
 
 # Start all services
 docker compose up -d
@@ -178,13 +184,49 @@ GET    /api/sensor-logs/statistics     # Get aggregated statistics (public)
 
 \`\`\`
 iot-monitoring-system/
+├── .github/workflows/  # CI, image publish, deploy
 ├── backend/          # Node.js/Express API
+├── deploy/           # Production env template, deploy/backup scripts, cloudflared config
+├── docs/             # Deployment guide
 ├── frontend/         # React application
-├── database/         # PostgreSQL init scripts
-├── grafana/          # Dashboards & config
+├── database/         # PostgreSQL init scripts & migrations
+├── grafana/          # Dashboards & provisioning
 ├── node-red/         # Data generation flows
-└── compose.yaml      # Docker services
+├── compose.yaml              # Base (local/dev) Docker services
+├── compose.production.yaml   # Production overlay (private, GHCR images)
+└── compose.admin.yaml        # Optional overlay for private admin UIs
 \`\`\`
+
+## 🚢 Production Deployment
+
+The app is deployed to a home server with prebuilt GHCR images, Tailscale and a
+Cloudflare Tunnel. In production **only the frontend is published** (loopback +
+tunnel); Grafana, Node-RED, Adminer and PostgreSQL are private.
+
+\`\`\`bash
+# One-time: generate secrets and validate the rendered stack
+./deploy/generate-env.sh
+docker compose --env-file deploy/.env -f compose.yaml -f compose.production.yaml config -q
+
+# Deploy a published image tag (health-verified, auto-rollback on failure)
+./deploy/deploy.sh v1.0.0
+./deploy/deploy.sh --rollback-previous
+
+# Back up database + state
+./deploy/backup.sh
+\`\`\`
+
+CI/CD (`.github/workflows/`):
+
+- **ci.yml** – lint, type-check, build, image build and Compose validation on
+  every push/PR.
+- **publish.yml** – builds and pushes `ghcr.io/<owner>/iot-monitoring-system-{backend,frontend,nodered}`
+  on `v*` tags or manual dispatch.
+- **deploy.yml** – deploys over the tailnet via strict SSH after approval
+  (GitHub `production` environment), with rollback support.
+
+See **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)** for the full runbook
+(prerequisites, server setup, secrets handling, backups, troubleshooting).
 
 ## 🐳 Docker Commands
 
@@ -217,9 +259,9 @@ docker compose ps
 
 Embedded dashboards are served **read-only to anonymous users** and the top
 navigation bar (including the search bar and its toggle) is hidden by appending
-`&kiosk` to the iframe URLs in `frontend/src/pages/Dashboard.tsx`.
+`&kiosk` to the iframe URLs in `frontend/src/utils/grafana.ts`.
 
-The Grafana service in `compose.yaml` enforces this:
+The Grafana service in `compose.yaml` enforces this for local development:
 
 - `GF_AUTH_ANONYMOUS_ENABLED=true` with `GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer`
   (anonymous users can view but cannot edit).
@@ -230,6 +272,20 @@ To temporarily regain admin access for maintenance, set
 `GF_AUTH_DISABLE_LOGIN_FORM=false` and recreate the container
 (`docker compose up -d --force-recreate grafana`), then sign in with the
 `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` credentials.
+
+**Production is different by design:** Grafana is *private* (reachable only over
+the tailnet or an SSH port-forward), so `compose.production.yaml` keeps the
+login form enabled and the frontend build leaves `VITE_GRAFANA_URL` empty —
+the embedded-dashboard entry points are hidden instead of showing a dead
+iframe. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) §7.
+
+### Node-RED security
+
+The Node-RED editor requires login (`adminAuth`) and its credentials come from
+the environment (`NODE_RED_ADMIN_PASSWORD_HASH`, `NODE_RED_ADMIN_USER`,
+`NODE_RED_CREDENTIAL_SECRET`). The flows hold no secrets: the PostgreSQL
+password and the backend `X-API-Key` are resolved from environment variables at
+runtime.
 
 ---
 

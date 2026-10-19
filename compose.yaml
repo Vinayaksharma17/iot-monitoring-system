@@ -1,9 +1,29 @@
+# Config convention: infra-level defaults (NODE_ENV, ports, DATABASE_URL) live
+# here; secrets and app tunables are forwarded from root .env with no baked-in
+# default (see .env.example) and defaulted in backend/src/config/env.ts.
+
+# Shared healthcheck timing, merged into each service with `<<: *healthcheck`
+# and overridden per service where needed.
+x-healthcheck: &healthcheck
+  interval: 30s
+  timeout: 10s
+  retries: 3
+  start_period: 40s
+
+# Cap container log growth so a chatty service cannot fill the host disk.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
 services:
   # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
     container_name: iot-postgres
     restart: unless-stopped
+    logging: *logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-iot_monitoring}
       POSTGRES_USER: ${POSTGRES_USER:-iot_user}
@@ -17,6 +37,7 @@ services:
     networks:
       - iot-network
     healthcheck:
+      <<: *healthcheck
       test:
         [
           'CMD-SHELL',
@@ -33,31 +54,35 @@ services:
       dockerfile: Dockerfile
     container_name: iot-backend
     restart: unless-stopped
+    logging: *logging
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: ${BACKEND_PORT:-3000}
       DATABASE_URL: postgresql://${POSTGRES_USER:-iot_user}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-iot_monitoring}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      APP_NAME: ${APP_NAME:-IoT Monitoring System}
-      APP_VERSION: ${APP_VERSION:-1.0.0}
       JWT_SECRET: ${JWT_SECRET:-}
-      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
-      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-}
+      LOG_LEVEL: ${LOG_LEVEL:-}
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
       INGEST_API_KEY: ${INGEST_API_KEY:-}
+      RETENTION_MAX_SIZE_GB: ${RETENTION_MAX_SIZE_GB:-}
+      RETENTION_CHECK_INTERVAL_MINUTES: ${RETENTION_CHECK_INTERVAL_MINUTES:-}
+      RETENTION_BYTES_PER_ROW: ${RETENTION_BYTES_PER_ROW:-}
     ports:
       - '${BACKEND_PORT:-3000}:3000'
     volumes:
-      - ./backend/logs:/usr/src/app/logs
+      # Path matches WORKDIR /app in backend/Dockerfile
+      - ./backend/logs:/app/logs
     networks:
       - iot-network
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
+      <<: *healthcheck
       test:
         [
           'CMD',
@@ -65,12 +90,8 @@ services:
           '--quiet',
           '--tries=1',
           '--spider',
-          'http://localhost:3000/health',
+          'http://127.0.0.1:3000/health',
         ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   # Node-RED Data Simulator
   nodered:
@@ -79,10 +100,26 @@ services:
       dockerfile: Dockerfile
     container_name: iot-nodered
     restart: unless-stopped
+    logging: *logging
     environment:
       TZ: ${TZ:-America/New_York}
       NODE_RED_ENABLE_SAFE_MODE: 'false'
       NODE_RED_ENABLE_PROJECTS: 'false'
+      # Flows resolve all of these from the environment (no secrets in the
+      # committed flows.json). Names must match the env field types used by
+      # the postgreSQLConfig node.
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: '5432'
+      POSTGRES_DB: ${POSTGRES_DB:-iot_monitoring}
+      POSTGRES_USER: ${POSTGRES_USER:-iot_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required for production}
+      INGEST_API_KEY: ${INGEST_API_KEY:-}
+      # Editor credentials (see node-red/settings.js). Without the hash the
+      # editor login cannot succeed, which fails safe.
+      NODE_RED_ADMIN_USER: ${NODE_RED_ADMIN_USER:-admin}
+      NODE_RED_ADMIN_PASSWORD_HASH: ${NODE_RED_ADMIN_PASSWORD_HASH:-}
+      NODE_RED_CREDENTIAL_SECRET: ${NODE_RED_CREDENTIAL_SECRET:-}
+      NODE_RED_DISABLE_EDITOR: ${NODE_RED_DISABLE_EDITOR:-}
     ports:
       - '${NODERED_PORT:-1880}:1880'
     volumes:
@@ -95,6 +132,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
+      <<: *healthcheck
       test:
         [
           'CMD',
@@ -102,21 +140,18 @@ services:
           '--quiet',
           '--tries=1',
           '--spider',
-          'http://localhost:1880',
+          'http://127.0.0.1:1880/ui/',
         ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   # Grafana Dashboard
   grafana:
     image: grafana/grafana:10.2.3
     container_name: iot-grafana
     restart: unless-stopped
+    logging: *logging
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD in .env}
       GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3001}
       GF_INSTALL_PLUGINS: ${GRAFANA_PLUGINS:-}
       # Allow iframe embedding
@@ -131,6 +166,12 @@ services:
       GF_AUTH_DISABLE_LOGIN_FORM: 'true'
       # Use SQLite for Grafana's internal database (keeps iot_monitoring clean)
       # PostgreSQL is still used as datasource for querying sensor data
+      #
+      # Consumed by grafana/provisioning/datasources/postgres.yaml via
+      # Grafana's $VAR interpolation (no password committed to the repo).
+      POSTGRES_DB: ${POSTGRES_DB:-iot_monitoring}
+      POSTGRES_USER: ${POSTGRES_USER:-iot_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required for production}
     ports:
       - '${GRAFANA_PORT:-3001}:3000'
     volumes:
@@ -143,6 +184,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
+      <<: *healthcheck
       test:
         [
           'CMD',
@@ -150,18 +192,15 @@ services:
           '--quiet',
           '--tries=1',
           '--spider',
-          'http://localhost:3000/api/health',
+          'http://127.0.0.1:3000/api/health',
         ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 
   # Adminer Database Management
   adminer:
-    image: adminer:latest
+    image: adminer:6.1.2
     container_name: iot-adminer
     restart: unless-stopped
+    logging: *logging
     environment:
       ADMINER_DEFAULT_SERVER: postgres
       ADMINER_DESIGN: nette
@@ -173,6 +212,8 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
+      <<: *healthcheck
+      start_period: 10s
       test:
         [
           'CMD',
@@ -180,20 +221,24 @@ services:
           '--quiet',
           '--tries=1',
           '--spider',
-          'http://localhost:8080',
+          'http://127.0.0.1:8080',
         ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
   # Frontend React Application
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        # Vite inlines these at build time.
+        VITE_API_URL: ${VITE_API_URL:-/api}
+        # Dev/container default points at the host-published Grafana port.
+        # The production override builds this empty so the (private) Grafana
+        # UI is hidden instead of showing a dead iframe.
+        VITE_GRAFANA_URL: ${VITE_GRAFANA_URL:-http://localhost:3001}
     container_name: iot-frontend
     restart: unless-stopped
+    logging: *logging
     ports:
       - '${FRONTEND_PORT:-5173}:80'
     networks:
@@ -202,6 +247,8 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
+      <<: *healthcheck
+      start_period: 10s
       test:
         [
           'CMD',
@@ -209,12 +256,8 @@ services:
           '--quiet',
           '--tries=1',
           '--spider',
-          'http://localhost:80',
+          'http://127.0.0.1:80',
         ]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
 
 networks:
   iot-network:

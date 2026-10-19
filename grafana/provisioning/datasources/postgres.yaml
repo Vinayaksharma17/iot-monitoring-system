@@ -1,0 +1,24 @@
+apiVersion: 1
+
+# Environment-variable interpolation ($VAR) is resolved by Grafana's
+# provisioning system at startup, so no database password is stored here.
+# The variables are provided by the grafana service in compose.yaml.
+datasources:
+  - name: PostgreSQL
+    type: postgres
+    access: proxy
+    url: postgres:5432
+    database: $POSTGRES_DB
+    user: $POSTGRES_USER
+    secureJsonData:
+      password: $POSTGRES_PASSWORD
+    jsonData:
+      database: $POSTGRES_DB
+      sslmode: 'disable'
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+      postgresVersion: 1500
+      timescaledb: false
+    isDefault: true
+    editable: true

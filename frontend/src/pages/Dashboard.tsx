@@ -8,7 +8,10 @@ import { StatCard } from '@/components/dashboard/StatCard'
 import { LatestReadingsTable } from '@/components/dashboard/LatestReadingsTable'
 import { GrafanaDashboardModal } from '@/components/dashboard/GrafanaDashboardModal'
 import { ErrorState } from '@/components/common/ErrorState'
-import type { GrafanaDashboardKey } from '@/utils/grafana'
+import {
+  IS_GRAFANA_ENABLED,
+  type GrafanaDashboardKey,
+} from '@/utils/grafana'
 
 const StatCardSkeleton = ({ title }: { title: string }) => (
   <div className="flex items-center bg-white p-6 rounded-lg shadow animate-pulse">
@@ -147,28 +150,32 @@ export function Dashboard() {
               <p className="text-sm text-gray-500">Configure sensors</p>
             </div>
           </Link>
-          <button
-            type="button"
-            onClick={() => setGrafanaModal('allBedrooms')}
-            className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors text-left w-full"
-          >
-            <Activity className="h-8 w-8 text-primary-600 mr-3" />
-            <div className="flex-1">
-              <h3 className="font-medium text-gray-900">All Bedrooms</h3>
-              <p className="text-sm text-gray-500">Real-time overview</p>
-            </div>
-          </button>
-          <button
-            type="button"
-            onClick={() => setGrafanaModal('singleBedroom')}
-            className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors text-left w-full"
-          >
-            <Activity className="h-8 w-8 text-primary-600 mr-3" />
-            <div className="flex-1">
-              <h3 className="font-medium text-gray-900">Single Bedroom</h3>
-              <p className="text-sm text-gray-500">Detailed view</p>
-            </div>
-          </button>
+          {IS_GRAFANA_ENABLED && (
+            <>
+              <button
+                type="button"
+                onClick={() => setGrafanaModal('allBedrooms')}
+                className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors text-left w-full"
+              >
+                <Activity className="h-8 w-8 text-primary-600 mr-3" />
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900">All Bedrooms</h3>
+                  <p className="text-sm text-gray-500">Real-time overview</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => setGrafanaModal('singleBedroom')}
+                className="flex items-center p-4 border border-gray-200 rounded-lg hover:border-primary-500 hover:bg-primary-50 transition-colors text-left w-full"
+              >
+                <Activity className="h-8 w-8 text-primary-600 mr-3" />
+                <div className="flex-1">
+                  <h3 className="font-medium text-gray-900">Single Bedroom</h3>
+                  <p className="text-sm text-gray-500">Detailed view</p>
+                </div>
+              </button>
+            </>
+          )}
         </div>
       </div>
 

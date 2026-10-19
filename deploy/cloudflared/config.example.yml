@@ -1,0 +1,38 @@
+# Cloudflare Tunnel configuration for the IoT Monitoring System.
+#
+# The tunnel runs on the server (as a service or its own container/unit) and
+# forwards ONLY the frontend to the internet. Grafana, Node-RED, Adminer and
+# PostgreSQL are deliberately absent from this file: they are private and are
+# reached over Tailscale or an SSH port-forward (see docs/DEPLOYMENT.md).
+#
+# Install:
+#   sudo mkdir -p /etc/cloudflared
+#   sudo cp deploy/cloudflared/config.example.yml /etc/cloudflared/config.yml
+#   # edit <TUNNEL_ID> and <PUBLIC_HOSTNAME>, place the credentials JSON
+#   sudo cloudflared tunnel --config /etc/cloudflared/config.yml ingress validate
+#   sudo systemctl enable --now cloudflared
+#
+# The hostname below must be created in Cloudflare DNS as a CNAME to
+# <TUNNEL_ID>.cfargotunnel.com (the `cloudflared tunnel route dns` command does
+# this for you).
+
+tunnel: <TUNNEL_ID>
+credentials-file: /etc/cloudflared/<TUNNEL_ID>.json
+
+# Optional: keep logs from growing without bound.
+loglevel: info
+metrics: 127.0.0.1:20241
+
+ingress:
+  # Public application (static SPA + /api proxied to the backend by nginx).
+  - hostname: <PUBLIC_HOSTNAME>
+    service: http://127.0.0.1:5173
+    originRequest:
+      # The backend sets no long-lived streams; a sane connect timeout avoids
+      # hanging on a wedged origin.
+      connectTimeout: 10s
+      # Do not send the visitor's identity headers to the origin.
+      noTLSVerify: false
+
+  # Everything else is refused.
+  - service: http_status:404

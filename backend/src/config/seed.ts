@@ -22,12 +22,6 @@ export const seedAdminUser = async (): Promise<void> => {
     return
   }
 
-  if (env.isProduction && password.length < 12) {
-    throw new Error(
-      'SEED_ADMIN_PASSWORD must be at least 12 characters in production'
-    )
-  }
-
   const existing = await query(
     "SELECT id FROM users WHERE role = 'admin' LIMIT 1"
   )
@@ -35,6 +29,12 @@ export const seedAdminUser = async (): Promise<void> => {
   if (existing.rows.length > 0) {
     logger.info('Admin user already exists, skipping seed')
     return
+  }
+
+  if (env.isProduction && password.length < 12) {
+    throw new Error(
+      'SEED_ADMIN_PASSWORD must be at least 12 characters in production'
+    )
   }
 
   const passwordHash = await bcrypt.hash(password, authConfig.bcryptRounds)

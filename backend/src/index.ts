@@ -11,8 +11,12 @@ import authRoutes from './routes/auth.routes.js'
 import bedroomRoutes from './routes/bedroom.routes.js'
 import sensorRoutes from './routes/sensor.routes.js'
 import sensorLogRoutes from './routes/sensor-log.routes.js'
-import pool, { closePool, pingDatabase } from './config/database.js'
+import { closePool, pingDatabase } from './config/database.js'
 import { seedAdminUser } from './config/seed.js'
+import {
+  startRetentionScheduler,
+  stopRetentionScheduler,
+} from './services/retention.service.js'
 
 // ==========================================
 // Express App Setup
@@ -143,6 +147,9 @@ const server = app.listen(env.port, () => {
   seedAdminUser().catch((error) => {
     logger.error('Failed to seed admin user:', error)
   })
+
+  // Keep sensor_logs within the configured disk budget (env-driven)
+  startRetentionScheduler()
 })
 
 // ==========================================
@@ -161,6 +168,7 @@ const gracefulShutdown = (signal: string, exitCode = 0): void => {
   isShuttingDown = true
 
   logger.info(`${signal} received. Starting graceful shutdown...`)
+  stopRetentionScheduler()
 
   const forceExit = setTimeout(() => {
     logger.error('⚠️  Forced shutdown after timeout')

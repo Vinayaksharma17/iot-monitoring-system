@@ -1,0 +1,88 @@
+# Production overlay for the home server (single-node Docker Compose stack).
+#
+# Usage on the server (from the repo checkout, e.g. /srv/appdata/compose/iot-monitoring):
+#   docker compose -f compose.yaml -f compose.production.yaml up -d --no-build
+#   docker compose -f compose.yaml -f compose.production.yaml ps
+#
+# Requirements:
+#   - Docker Compose >= 2.24 (uses the !reset / !override merge tags)
+#   - Images are prebuilt and pushed to GHCR by CI (.github/workflows/publish.yml)
+#   - Environment from deploy/.env (see deploy/.env.production.example)
+#
+# Design: this file replaces (not appends to) the published ports and mounts of
+# the base file, so nothing but the frontend is reachable from the host, and all
+# state lives under /srv/appdata/iot-monitoring.
+
+# Clears the base file's named volumes: in production every piece of state is a
+# bind mount under /srv/appdata (easier to back up and to reason about).
+volumes: !override {}
+
+services:
+  postgres:
+    # Reachable only from the internal Docker network.
+    ports: !reset []
+    volumes: !override
+      - /srv/appdata/iot-monitoring/postgres:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    security_opt: ['no-new-privileges:true']
+
+  backend:
+    image: ghcr.io/vinayaksharma17/iot-monitoring-system-backend:${IMAGE_TAG:-latest}
+    ports: !reset []
+    volumes: !override
+      - /srv/appdata/iot-monitoring/backend-logs:/app/logs
+    environment:
+      NODE_ENV: production
+      # Browser origin that calls the API through the tunnel. Must be the exact
+      # scheme+host users visit, e.g. https://<PUBLIC_HOSTNAME>.
+      CORS_ORIGIN: ${PUBLIC_ORIGIN:?set PUBLIC_ORIGIN (e.g. https://<PUBLIC_HOSTNAME>) in deploy/.env}
+    security_opt: ['no-new-privileges:true']
+
+  nodered:
+    image: ghcr.io/vinayaksharma17/iot-monitoring-system-nodered:${IMAGE_TAG:-latest}
+    ports: !reset []
+    volumes: !override
+      - /srv/appdata/iot-monitoring/nodered:/data
+    environment:
+      # Editor stays enabled but is only ever reached over Tailscale or an SSH
+      # port-forward; it is never routed through the public tunnel.
+      NODE_RED_DISABLE_EDITOR: 'false'
+    security_opt: ['no-new-privileges:true']
+
+  grafana:
+    ports: !reset []
+    volumes: !override
+      - /srv/appdata/iot-monitoring/grafana:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      # Grafana is private in production, so the login form must stay available
+      # for administration over the tailnet / SSH port-forward (the base file
+      # disables it because dashboards are embedded anonymously in dev).
+      GF_AUTH_DISABLE_LOGIN_FORM: 'false'
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+      GF_AUTH_ANONYMOUS_HIDE_VERSION: 'true'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+    security_opt: ['no-new-privileges:true']
+
+  adminer:
+    # Tooling only: never started by normal deploys. Enable deliberately with
+    # compose.admin.yaml (binds to the Tailscale interface) after a port-forward.
+    profiles: ['tools']
+    ports: !reset []
+    security_opt: ['no-new-privileges:true']
+
+  frontend:
+    image: ghcr.io/vinayaksharma17/iot-monitoring-system-frontend:${IMAGE_TAG:-latest}
+    build:
+      args:
+        VITE_API_URL: /api
+        # Empty on purpose: Grafana is private, so the embedded-dashboard UI is
+        # hidden rather than showing a broken iframe.
+        VITE_GRAFANA_URL: ''
+    # The only published port: loopback-only for the Cloudflare Tunnel.
+    ports: !override
+      - '127.0.0.1:${FRONTEND_PORT:-5173}:80'
+    security_opt: ['no-new-privileges:true']

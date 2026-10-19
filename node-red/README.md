@@ -1,244 +1,105 @@
 # Node-RED IoT Data Simulation
 
-This Node-RED setup simulates IoT sensor data for the monitoring system by generating realistic temperature and humidity readings that are inserted into the PostgreSQL database.
+Node-RED flow that simulates temperature/humidity sensor data for the IoT
+Monitoring System. It discovers active sensors through the backend API and
+inserts generated readings directly into PostgreSQL.
 
 ## Overview
 
-The simulation consists of two main flows:
+Two flows run in one tab:
 
-1. **Initialization Flow**: Fetches active sensors from the backend API on startup
-2. **Data Simulation Flow**: Generates realistic sensor readings every 60 seconds
+1. **Initialization** — once on start (5 s delay): `GET /api/sensors/active`,
+   stores the sensors in global context.
+2. **Data Simulation** — every 60 s: generates a realistic value per sensor
+   (smooth transitions inside min/max bounds) and inserts it into
+   `sensor_logs`. Debug output is on the sidebar.
 
-## Flow Architecture
+## Credentials and secrets (no hardcoded values)
 
-### Flow 1: Sensor Initialization
+Nothing sensitive is committed. Both the database connection and the backend
+API key are resolved from environment variables at runtime.
 
-**Purpose**: Retrieve active sensors from the backend API and store them in global context.
+- **PostgreSQL config node** (`postgreSQLConfig`, "IoT Database") uses the
+  `env` type for `host`, `database`, `user` and `password`:
+  `POSTGRES_HOST`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`.
+  `node-red-contrib-postgresql` resolves these with `process.env[...]` at
+  deploy time, so no password appears in `flows.json`.
+- **Sensor discovery request** ("Add X-API-Key Header" change node) sets
+  `msg.headers["X-API-Key"] = $(INGEST_API_KEY)` before the HTTP request,
+  matching the backend's `requireApiKey` guard. If `INGEST_API_KEY` is empty
+  on the backend, the header is ignored (guard is a no-op).
+- **Editor auth** (`settings.js`) requires `NODE_RED_ADMIN_PASSWORD_HASH`
+  (bcrypt) and `NODE_RED_ADMIN_USER`; `credentialSecret` comes from
+  `NODE_RED_CREDENTIAL_SECRET`. The editor is only reachable over the private
+  network (Tailscale / SSH port-forward) — never through Cloudflare.
 
-**Flow Steps**:
+The same root `.env` feeds the backend and Node-RED (see `compose.yaml`), so
+`POSTGRES_*` and `INGEST_API_KEY` can never drift between them.
 
-1. **Inject Node**: Triggers once on startup (5-second delay)
-2. **HTTP Request**: `GET http://backend:3000/api/sensors/active`
-   - Returns sensor metadata: `sensorId`, `sensorName`, `bedroomName`, `type`, `minValue`, `maxValue`
-3. **Function Node**: Stores sensors in `global.activeSensors` and initializes `lastSensorValues` for smooth transitions
-4. **Debug Node**: Outputs initialization status
+## Persistence / bootstrap
 
-### Flow 2: Data Simulation
+`/data` is a persistent volume or bind mount. On startup,
+`entrypoint.sh` seeds `settings.js` and `flows.json` from
+`/opt/node-red-bootstrap` **only when they are missing**, so it:
 
-**Purpose**: Generate realistic sensor readings that maintain smooth transitions and stay within configured bounds.
+- makes a fresh bind-mounted server work out of the box, and
+- never overwrites flows you edited in the editor.
 
-**Flow Steps**:
-
-1. **Inject Node**: Triggers every 60 seconds
-2. **Prepare Sensors Function**: Retrieves active sensors from global context
-3. **Split Node**: Processes each sensor individually
-4. **Generate Value Function**:
-   - For temperature: ±1.5°C random change with smooth transitions
-   - For humidity: ±3% random change with smooth transitions
-   - Respects `minValue` and `maxValue` constraints
-   - Maintains last value for continuity
-5. **PostgreSQL Insert**: Writes to `sensor_logs` table
-6. **Debug Node**: Outputs generated readings
-
-## Data Generation Algorithm
-
-```javascript
-// Temperature example
-const change = (Math.random() - 0.5) * 3 // ±1.5°C
-let newValue = lastValue + change
-newValue = Math.max(minValue, Math.min(maxValue, newValue)) // Bound check
-```
-
-This creates realistic, smooth sensor readings that:
-
-- Avoid sudden jumps
-- Stay within physical sensor limits
-- Simulate natural environmental variations
+To ship a flow change to an existing instance, either edit+deploy in the
+editor, or remove `flows.json` from the data directory before redeploying.
 
 ## Configuration
 
-### PostgreSQL Connection
+| Setting | Value |
+| --- | --- |
+| Editor root | `/admin` (auth required) |
+| Dashboard UI | `/ui` |
+| Init delay | 5 s |
+| Simulation interval | 60 s (inject node `repeat`) |
+| Context | memory + localfilesystem |
 
-Located in the PostgreSQL config node:
+## Pinned dependencies
 
-- **Host**: `postgres` (Docker service name)
-- **Port**: `5432`
-- **Database**: `iot_monitoring`
-- **User**: `iot_user`
-- **Password**: `iot_password`
+Dependencies are installed with `npm ci` from the committed
+`package-lock.json`:
 
-### Backend API Connection
+- `node-red-contrib-postgresql@0.16.2`
+- `node-red-dashboard@3.6.6`
 
-The initialization flow connects to:
+The base image is pinned to `nodered/node-red:5.0.8`. To upgrade, bump the tag
+deliberately, rebuild, and re-verify inserts in a staging stack.
 
-- **URL**: `http://backend:3000/api/sensors/active`
-- **Method**: GET
-- **Expected Response**: Array of active sensors with metadata
+## Interfaces (private only)
 
-### Timing Configuration
+- Flow editor: `http://127.0.0.1:1880/admin` (via SSH port-forward or tailnet)
+- Dashboard: `http://127.0.0.1:1880/ui/`
+- Health endpoint used by Docker: `GET /ui/`
 
-- **Initialization Delay**: 5 seconds (allows backend to start)
-- **Simulation Interval**: 60 seconds (1 minute)
+None of these ports are published to the host in production.
 
-To change the simulation frequency, modify the inject node's `repeat` property in `flows.json`.
-
-## Custom Nodes
-
-This setup uses three additional Node-RED nodes:
-
-1. **node-red-node-postgres** (v1.0.4): PostgreSQL database operations
-2. **node-red-contrib-loop-processing** (v0.6.1): Advanced loop control
-3. **node-red-dashboard** (v3.6.0): Web-based dashboard UI
-
-## File Structure
+## Files
 
 ```
 node-red/
-├── package.json          # Dependencies and project metadata
-├── settings.js           # Node-RED runtime configuration
-├── flows.json           # Simulation flow definitions
-├── Dockerfile           # Container image configuration
-├── .dockerignore        # Docker build exclusions
-└── README.md           # This file
+├── package.json            # pinned palette dependencies
+├── package-lock.json       # reproducible install (npm ci)
+├── settings.js             # runtime config; auth from environment
+├── flows.json              # flow definitions; credentials from environment
+├── entrypoint.sh           # seeds /data on first start, then starts Node-RED
+├── Dockerfile
+└── README.md
 ```
-
-## Settings Configuration
-
-Key settings in `settings.js`:
-
-- **Flow File**: `flows.json`
-- **User Directory**: `/data`
-- **Logging Level**: `info`
-- **Context Storage**: Memory + File system persistence
-- **HTTP Admin Root**: `/admin` (Flow editor UI)
-- **HTTP Node Root**: `/` (Flow endpoints)
-- **Dashboard UI**: `/ui` (Dashboard interface)
-
-## Docker Setup
-
-### Build Image
-
-```bash
-cd node-red
-docker build -t iot-nodered:latest .
-```
-
-### Run Container
-
-```bash
-docker run -d \
-  --name iot-nodered \
-  -p 1880:1880 \
-  -v node-red-data:/data \
-  -e TZ=America/New_York \
-  iot-nodered:latest
-```
-
-### Access Interfaces
-
-- **Flow Editor**: http://localhost:1880/admin
-- **Dashboard UI**: http://localhost:1880/ui
-
-## Usage
-
-### Starting the Simulation
-
-1. Ensure PostgreSQL and backend services are running
-2. Start Node-RED container
-3. The initialization flow will automatically fetch active sensors
-4. Data generation begins after 65 seconds (5s init delay + 60s first interval)
-
-### Monitoring Simulation
-
-- **Flow Editor**: View flow execution and debug messages at `/admin`
-- **Dashboard**: Real-time sensor readings at `/ui`
-- **Database**: Query `sensor_logs` table for historical data
-
-### Modifying Flows
-
-1. Access the flow editor at `/admin`
-2. Make changes to flows
-3. Click "Deploy" to apply changes
-4. Flows are persisted to `flows.json`
-
-### Adding New Sensors
-
-The simulation automatically adapts when sensors are added via the backend API:
-
-1. Create a new sensor using the backend API
-2. Set `is_active = true`
-3. The next initialization cycle (or restart Node-RED) will include it
 
 ## Troubleshooting
 
-### No Data Being Generated
-
-1. **Check Backend Connection**: Verify initialization flow successfully fetched sensors
-2. **View Debug Messages**: Look for errors in debug panel
-3. **Verify PostgreSQL**: Ensure database connection is successful
-4. **Check Sensor Status**: Confirm sensors exist and `is_active = true`
-
-### Database Connection Errors
-
-- Verify PostgreSQL service is running
-- Check connection credentials in PostgreSQL config node
-- Ensure network connectivity between containers
-
-### Backend API Not Responding
-
-- Verify backend service is running on port 3000
-- Check the backend health endpoint: `http://backend:3000/api/health`
-- Ensure backend has database connection
-
-## Integration with Backend
-
-The simulation relies on the backend API endpoint `/api/sensors/active` which returns:
-
-```json
-[
-  {
-    "sensorId": 1,
-    "sensorName": "Temp Sensor 1",
-    "bedroomName": "Master Bedroom",
-    "type": "temperature",
-    "minValue": 15,
-    "maxValue": 30
-  }
-]
-```
-
-## Data Schema
-
-Generated sensor logs follow this structure:
-
-```sql
-INSERT INTO sensor_logs (sensor_id, value, recorded_at)
-VALUES ($1, $2, NOW());
-```
-
-Where:
-
-- `sensor_id`: References `sensors.sensor_id`
-- `value`: Generated numeric reading (DECIMAL(10,2))
-- `recorded_at`: Current timestamp
-
-## Performance
-
-- **Memory Usage**: ~50-100 MB (base Node-RED + custom nodes)
-- **CPU Usage**: Minimal (periodic 60-second intervals)
-- **Database Load**: One INSERT per sensor per minute
-- **Scalability**: Supports 100+ sensors without performance degradation
-
-## Future Enhancements
-
-Potential improvements:
-
-- Add anomaly simulation (sensor failures, outliers)
-- Variable interval timing based on sensor type
-- MQTT protocol support for real-time streaming
-- WebSocket connections for live dashboard updates
-- Machine learning-based pattern generation
-- Historical data replay mode
+- **No data generated** — check the initialization flow loaded sensors
+  (sidebar debug). Confirm `is_active = true` sensors exist.
+- **Database errors** — verify `POSTGRES_*` env vars are present in the
+  container (`docker compose exec nodered env | grep POSTGRES_`).
+- **401 from backend** — the `INGEST_API_KEY` value differs between the
+  backend and Node-RED containers; both come from the root `.env`.
+- **Editor login fails** — `NODE_RED_ADMIN_PASSWORD_HASH` is missing or is not
+  a valid bcrypt hash; regenerate it with `deploy/generate-env.sh`.
 
 ## License
 

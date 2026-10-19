@@ -1,5 +1,18 @@
+// Grafana is a private, internal service. It is never exposed through the
+// public reverse proxy, so the embedded-dashboard UI is only enabled when a
+// reachable base URL is configured at build time:
+//   - local development: falls back to the host-published http://localhost:3001
+//   - production:        set VITE_GRAFANA_URL to a Tailscale-reachable URL if
+//                        you want the dashboards, otherwise leave it unset and
+//                        the UI entry points are hidden (no dead iframes).
+const configuredUrl = (import.meta.env.VITE_GRAFANA_URL ?? '').trim()
+
+const DEV_FALLBACK_URL = 'http://localhost:3001'
+
 const rawBaseUrl =
-  import.meta.env.VITE_GRAFANA_URL || 'http://localhost:3001'
+  configuredUrl || (import.meta.env.DEV ? DEV_FALLBACK_URL : '')
+
+export const IS_GRAFANA_ENABLED = rawBaseUrl.length > 0
 
 export const GRAFANA_BASE_URL = rawBaseUrl.replace(/\/+$/, '')
 

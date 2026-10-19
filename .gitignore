@@ -55,11 +55,20 @@ postgres-data/
 # Docker
 docker-compose.override.yml
 
+# Deployment runtime state and real environment files (never committed).
+# Templates (*.example) ARE tracked.
+deploy/.env
+deploy/.env.production
+deploy/deploy.env
+deploy/.deployed
+deploy/*.local
+
 # Grafana
 grafana/data/
 grafana/plugins/
-grafana/provisioning/
 grafana.db
+# NOTE: grafana/provisioning/ IS tracked on purpose (datasources + dashboard
+# providers are deployment configuration and must ship with the release).
 
 # Node-RED
 node-red/node_modules/

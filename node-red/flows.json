@@ -27,6 +27,40 @@
     "y": 80,
     "wires": [
       [
+        "set_api_key_header"
+      ]
+    ]
+  },
+  {
+    "id": "set_api_key_header",
+    "type": "change",
+    "z": "flow1",
+    "name": "Add X-API-Key Header",
+    "rules": [
+      {
+        "t": "set",
+        "p": "headers",
+        "pt": "msg",
+        "to": "{}",
+        "tot": "json"
+      },
+      {
+        "t": "set",
+        "p": "headers[\"X-API-Key\"]",
+        "pt": "msg",
+        "to": "INGEST_API_KEY",
+        "tot": "env"
+      }
+    ],
+    "action": "",
+    "property": "",
+    "from": "",
+    "to": "",
+    "reg": false,
+    "x": 275,
+    "y": 80,
+    "wires": [
+      [
         "http_get_sensors"
       ]
     ]
@@ -43,9 +77,9 @@
     "tls": "",
     "persist": false,
     "proxy": "",
-    "authType": "basic",
+    "authType": "",
     "senderr": false,
-    "x": 380,
+    "x": 480,
     "y": 80,
     "wires": [
       [
@@ -232,12 +266,12 @@
     "id": "postgres_config",
     "type": "postgreSQLConfig",
     "name": "IoT Database",
-    "host": "postgres",
-    "hostFieldType": "str",
+    "host": "POSTGRES_HOST",
+    "hostFieldType": "env",
     "port": "5432",
     "portFieldType": "num",
-    "database": "iot_monitoring",
-    "databaseFieldType": "str",
+    "database": "POSTGRES_DB",
+    "databaseFieldType": "env",
     "ssl": "false",
     "sslFieldType": "bool",
     "applicationName": "",
@@ -248,9 +282,9 @@
     "idleFieldType": "num",
     "connectionTimeout": "10000",
     "connectionTimeoutFieldType": "num",
-    "user": "iot_user",
-    "userFieldType": "str",
-    "password": "iot_password",
-    "passwordFieldType": "str"
+    "user": "POSTGRES_USER",
+    "userFieldType": "env",
+    "password": "POSTGRES_PASSWORD",
+    "passwordFieldType": "env"
   }
 ]
