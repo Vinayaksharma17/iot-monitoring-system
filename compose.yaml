@@ -131,6 +131,11 @@ services:
       GF_AUTH_DISABLE_LOGIN_FORM: 'true'
       # Use SQLite for Grafana's internal database (keeps iot_monitoring clean)
       # PostgreSQL is still used as datasource for querying sensor data
+      #
+      # Values consumed by grafana/provisioning/datasources/postgres.yaml
+      DATASOURCE_POSTGRES_USER: ${POSTGRES_USER:-iot_user}
+      DATASOURCE_POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      DATASOURCE_POSTGRES_DB: ${POSTGRES_DB:-iot_monitoring}
     ports:
       - '${GRAFANA_PORT:-3001}:3000'
     volumes:

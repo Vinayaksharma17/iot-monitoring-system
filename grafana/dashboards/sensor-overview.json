@@ -24,8 +24,8 @@
   "panels": [
     {
       "datasource": {
-        "type": "postgres",
-        "uid": "postgres"
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
       },
       "fieldConfig": {
         "defaults": {
@@ -98,8 +98,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "postgres",
-            "uid": "postgres"
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
           },
           "editorMode": "code",
           "format": "time_series",
@@ -130,8 +130,8 @@
     },
     {
       "datasource": {
-        "type": "postgres",
-        "uid": "postgres"
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
       },
       "fieldConfig": {
         "defaults": {
@@ -204,8 +204,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "postgres",
-            "uid": "postgres"
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
           },
           "editorMode": "code",
           "format": "time_series",
@@ -236,8 +236,8 @@
     },
     {
       "datasource": {
-        "type": "postgres",
-        "uid": "postgres"
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
       },
       "fieldConfig": {
         "defaults": {
@@ -280,8 +280,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "postgres",
-            "uid": "postgres"
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
           },
           "editorMode": "code",
           "format": "table",
@@ -312,8 +312,8 @@
     },
     {
       "datasource": {
-        "type": "postgres",
-        "uid": "postgres"
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
       },
       "fieldConfig": {
         "defaults": {
@@ -356,8 +356,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "postgres",
-            "uid": "postgres"
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
           },
           "editorMode": "code",
           "format": "table",
@@ -388,8 +388,8 @@
     },
     {
       "datasource": {
-        "type": "postgres",
-        "uid": "postgres"
+        "type": "grafana-postgresql-datasource",
+        "uid": "PCC52D03280B7034C"
       },
       "fieldConfig": {
         "defaults": {
@@ -510,8 +510,8 @@
       "targets": [
         {
           "datasource": {
-            "type": "postgres",
-            "uid": "postgres"
+            "type": "grafana-postgresql-datasource",
+            "uid": "PCC52D03280B7034C"
           },
           "editorMode": "code",
           "format": "table",

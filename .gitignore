@@ -58,7 +58,6 @@ docker-compose.override.yml
 # Grafana
 grafana/data/
 grafana/plugins/
-grafana/provisioning/
 grafana.db
 
 # Node-RED

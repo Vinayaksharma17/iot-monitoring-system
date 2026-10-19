@@ -1,0 +1,21 @@
+apiVersion: 1
+
+datasources:
+  - name: PostgreSQL
+    uid: PCC52D03280B7034C
+    type: grafana-postgresql-datasource
+    access: proxy
+    url: postgres:5432
+    user: ${DATASOURCE_POSTGRES_USER}
+    database: ${DATASOURCE_POSTGRES_DB}
+    isDefault: true
+    editable: false
+    jsonData:
+      sslmode: disable
+      postgresVersion: 1500
+      timescaledb: false
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+    secureJsonData:
+      password: ${DATASOURCE_POSTGRES_PASSWORD}
