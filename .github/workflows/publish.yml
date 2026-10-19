@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       ref:
-        description: 'Git ref to build (usually a tag, e.g. v1.0.0)'
+        description: 'Git ref to build: tag (v1.0.0), branch, or commit SHA (short SHA accepted)'
         required: true
 
 permissions:
@@ -42,9 +42,45 @@ jobs:
             context: ./node-red
             build_args: ''
     steps:
+      - name: Resolve source ref
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_REF: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+        run: |
+          set -euo pipefail
+          ref="$REQUESTED_REF"
+          # git can fetch only a full SHA, a branch or a tag. A short SHA fails
+          # with "fatal: couldn't find remote ref", which is surfaced by
+          # actions/checkout as "The process '/usr/bin/git' failed".
+          # Expand commit prefixes to the full SHA first; the API resolves an
+          # exact branch/tag name to its tip commit as well.
+          if [[ "$ref" =~ ^[0-9a-fA-F]{4,39}$ ]]; then
+            declare -a curl_opts=(--fail --show-error --silent --max-time 20 -H "Accept: application/vnd.github+json")
+            if [[ -n "${GH_TOKEN:-}" ]]; then
+              curl_opts+=(-H "Authorization: Bearer ${GH_TOKEN}")
+            fi
+            if ! resp="$(curl "${curl_opts[@]}" "https://api.github.com/repos/${GITHUB_REPOSITORY}/commits/${ref}")"; then
+              echo "Failed to resolve '${ref}' to a commit via GitHub API" >&2
+              exit 1
+            fi
+            full="$(jq -r '.sha // empty' <<<"$resp" 2>/dev/null)" || full=""
+            if ! [[ "$full" =~ ^[0-9a-fA-F]{40}$ ]]; then
+              echo "Invalid commit SHA returned for '${ref}': '${full}'" >&2
+              exit 1
+            fi
+            if [[ "${full:0:${#ref}}" != "$ref" && "$full" != "$ref" ]]; then
+              echo "Resolved SHA '${full}' does not match requested prefix '${ref}'" >&2
+              exit 1
+            fi
+            echo "Resolved commit prefix '${ref}' to '${full}'"
+            ref="$full"
+          fi
+          echo "ref=${ref}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
+          ref: ${{ steps.source.outputs.ref }}
 
       - name: Lowercase owner for GHCR
         id: owner
