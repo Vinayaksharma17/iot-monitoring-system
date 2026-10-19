@@ -15,13 +15,17 @@ WORKDIR /usr/src/node-red
 # Installed into /tmp first and merged into the base image's node_modules so
 # the base image's own package.json / package-lock.json stay untouched.
 # (The base image already provides bash, curl and wget - it is Debian-based.)
+#
+# Note: --prefix is used instead of `cd` so the shell's working directory stays
+# at WORKDIR (/usr/src/node-red) the whole time. Deleting /tmp/iot-nodes while
+# it is the cwd breaks any later command in the same RUN with ENOENT (uv_cwd).
+# The cache is cleaned before the temporary directory is removed.
 COPY package.json package-lock.json /tmp/iot-nodes/
-RUN cd /tmp/iot-nodes && \
-    npm ci --omit=dev && \
+RUN npm ci --omit=dev --prefix /tmp/iot-nodes && \
     cp -r /tmp/iot-nodes/node_modules/. /usr/src/node-red/node_modules/ && \
-    rm -rf /tmp/iot-nodes && \
+    npm cache clean --force && \
     chown -R node-red:node-red /usr/src/node-red/node_modules && \
-    npm cache clean --force
+    rm -rf /tmp/iot-nodes
 
 # Seed copies for named-volume users (dev) and for the bind-mount bootstrap
 # performed by the entrypoint (production: bind mounts are not auto-populated).
