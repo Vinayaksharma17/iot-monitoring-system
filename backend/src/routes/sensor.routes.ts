@@ -40,7 +40,17 @@ const listQuerySchema = Joi.object({
  * @desc    Get all active sensors (for machine/ingestion clients such as Node-RED)
  * @access  Public, or protected by X-API-Key when INGEST_API_KEY is configured
  */
-router.get('/active', requireApiKey, asyncHandler(getActiveSensors))
+router.get(
+  '/active',
+  (req, res, next) => {
+    const apiKey = req.headers['x-api-key']
+    if (apiKey) {
+      return requireApiKey(req, res, next)
+    }
+    return authenticateUser(req, res, next)
+  },
+  asyncHandler(getActiveSensors),
+)
 
 /**
  * @route   GET /api/sensors
@@ -52,7 +62,7 @@ router.get(
   '/',
   authenticateUser,
   validateQuery(listQuerySchema),
-  asyncHandler(getAllSensors)
+  asyncHandler(getAllSensors),
 )
 
 /**
@@ -64,7 +74,7 @@ router.get(
   '/bedrooms/:bedroomId',
   authenticateUser,
   validateNumericId('bedroomId'),
-  asyncHandler(getSensorsByBedroomId)
+  asyncHandler(getSensorsByBedroomId),
 )
 
 /**
@@ -78,7 +88,7 @@ router.post(
   validateNumericId('bedroomId'),
   checkPermissions('write'),
   validateCreateSensor,
-  asyncHandler(createSensor)
+  asyncHandler(createSensor),
 )
 
 /**
@@ -90,7 +100,7 @@ router.get(
   '/:id',
   authenticateUser,
   validateNumericId('id'),
-  asyncHandler(getSensorById)
+  asyncHandler(getSensorById),
 )
 
 /**
@@ -104,7 +114,7 @@ router.put(
   validateNumericId('id'),
   checkPermissions('update'),
   validateUpdateSensor,
-  asyncHandler(updateSensor)
+  asyncHandler(updateSensor),
 )
 
 /**
@@ -117,7 +127,7 @@ router.delete(
   authenticateUser,
   validateNumericId('id'),
   authorizeRoles('admin'),
-  asyncHandler(deleteSensor)
+  asyncHandler(deleteSensor),
 )
 
 export default router
